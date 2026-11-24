@@ -20,14 +20,16 @@
   "sideEffects": false,
   "scripts": {
     "build": "rimraf dist && tsc -p tsconfig.json",
-    "clean": "rimraf dist",
+    "build:samples": "tsc -p tsconfig.json --outDir examples/sdk",
+    "clean": "rimraf dist examples/sdk",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "docs": "typedoc --options typedoc.json",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "test": "vitest run",
     "test:watch": "vitest",
-    "examples": "npm run build && vite"
+    "examples": "npm run build:samples && vite",
+    "war": "npm run build:samples && mvn -q package"
   },
   "devDependencies": {
     "@eslint/js": "^9.12.0",

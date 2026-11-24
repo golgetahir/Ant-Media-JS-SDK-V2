@@ -93,7 +93,7 @@ await session.stop();
 </main>
 
 <script type="module">
-  import { WebRTCClient, generateRandomString } from "../dist/index.js";
+  import { WebRTCClient, generateRandomString } from "./sdk/index.js";
   import { websocketURL, streamLink, explain, logFailures, cameraPreview } from "./common.js";
   import { onStateChange } from "./ui/session-element.js";
   import { copy } from "./ui/copy.js";

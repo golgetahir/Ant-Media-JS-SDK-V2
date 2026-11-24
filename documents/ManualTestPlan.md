@@ -10,7 +10,7 @@ Either deploy them into a local server:
 ./redeploy.sh LiveApp
 ```
 
-and open `http://localhost:5080/LiveApp/js-sdk/examples/publish.html`. These pages connect to the app they are served from.
+and open `http://localhost:5080/LiveApp/samples/publish.html`. These pages connect to the app they are served from.
 
 Or serve them from the repository:
 

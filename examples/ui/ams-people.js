@@ -12,11 +12,13 @@ const row = (name, extra = "") => {
 
 /**
  * Who is in the room, given the room's play session: you, then `people` (id → { name, micMuted,
- * cameraOff }), each with a pin that keeps them on a video slot.
+ * cameraOff }), each with a pin that keeps them on a video slot. `pinned` is the id you pinned, kept
+ * by the page: a pin click tells it with a bubbling `ams-pin` event, the id now pinned or "".
  */
 class AmsPeople extends SessionElement {
+  pinned = "";
   #people = new Map();
-  // the last video_track_assignments: who is on which slot, and which are pinned
+  // the last video_track_assignments: who is on which slot
   #assigned = [];
 
   set people(people) {
@@ -39,11 +41,14 @@ class AmsPeople extends SessionElement {
     ];
   }
 
-  // pin on their own slot, else on the first; unpin releases their slot
-  async #pin(id, pinned) {
-    const slot = this.#assigned.find((a) => a.trackId === id) ?? this.#assigned[0];
+  // one pin at a time: release the one pinned before, then pin on their own slot, else on the first
+  async #pin(id) {
+    const old = this.pinned;
+    const slot = (who) => this.#assigned.find((a) => a.trackId === who);
     try {
-      await this.session.assignVideoTrack(slot.videoLabel, id, !pinned);
+      if (old && slot(old)) await this.session.assignVideoTrack(slot(old).videoLabel, old, false);
+      if (id !== old) await this.session.assignVideoTrack((slot(id) ?? this.#assigned[0]).videoLabel, id, true);
+      this.dispatchEvent(new CustomEvent("ams-pin", { bubbles: true, detail: id === old ? "" : id }));
     } catch (e) {
       reportFailure(this, "assignVideoTrack()", e);
     }
@@ -58,7 +63,7 @@ class AmsPeople extends SessionElement {
     list.replaceChildren();
     if (joined) list.append(row("You"));
     for (const [id, { name, micMuted, cameraOff }] of joined ? this.#people : []) {
-      const pinned = this.#assigned.some((a) => a.trackId === id && a.reserved);
+      const pinned = id === this.pinned;
       const marks = (micMuted ? mark("mic-off", "Microphone off") : "") + (cameraOff ? mark("cam-off", "Camera off") : "");
       const li = row(name, `${marks}<button class="mini pin" type="button">${icon("pin")}</button>`);
       const pin = li.querySelector("button");
@@ -67,7 +72,7 @@ class AmsPeople extends SessionElement {
       pin.setAttribute("aria-label", `Pin ${name}`);
       pin.setAttribute("aria-pressed", pinned);
       pin.disabled = !this.#assigned.length;
-      pin.onclick = () => this.#pin(id, pinned);
+      pin.onclick = () => this.#pin(id);
       list.append(li);
       if (id === focused) pin.focus();
     }

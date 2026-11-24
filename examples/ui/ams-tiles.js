@@ -6,12 +6,14 @@ import { SessionElement, reportFailure } from "./session-element.js";
  * A room's videos, given the room's play session: your own tile, `own`, always (an <ams-stage>: its
  * `video` and setPlaceholder() are your camera preview), and a tile for each video slot the server
  * fills. What the page puts inside (overlays, controls) stays on top. `people` names the others
- * (id → { name, micMuted, cameraOff }); `myId` is your own publish id; the server sends `perPage`
- * videos and the pager moves through everyone.
+ * (id → { name, micMuted, cameraOff }); `myId` is your own publish id; `pinned` is the id you pinned,
+ * kept by the page; the server sends `perPage` videos and the pager moves through everyone.
  */
 class AmsTiles extends SessionElement {
   myId = "";
+  pinned = "";
   #people = new Map();
+  #count = 0;
   #perPage = 6;
   #page = 0;
   // video label → its tile, audio label → its <audio>; the last video_track_assignments
@@ -24,7 +26,7 @@ class AmsTiles extends SessionElement {
     this.insertAdjacentHTML(
       "afterbegin",
       `<div class="tiles"><ams-stage class="tile"><span class="glass name">You</span></ams-stage></div>
-      <div class="overlay tr glass pager" hidden>
+      <div class="overlay br glass pager" hidden>
         <button type="button" aria-label="Previous page" title="Previous page">${icon("prev")}</button><span></span>
         <button type="button" aria-label="Next page" title="Next page">${icon("next")}</button>
       </div>`,
@@ -50,10 +52,12 @@ class AmsTiles extends SessionElement {
   }
 
   set people(people) {
+    const moved = people.size !== this.#count;
     this.#people = people;
-    // people left: stay on a page that exists
-    if (this.#page > this.#last()) this.#turn(this.#last());
-    this.paint();
+    this.#count = people.size;
+    // someone came or left: the pages shift, ask for this one (or the last) again
+    if (moved) this.#turn(Math.min(this.#page, this.#last()));
+    else this.paint();
   }
 
   set perPage(n) {
@@ -127,19 +131,24 @@ class AmsTiles extends SessionElement {
     const grid = this.querySelector(".tiles");
     if (!grid) return;
     let count = 1;
+    // a short last page: the server fills its first slots, the rest keep the page before's videos
+    const onPage = Math.min(this.#perPage, this.#people.size - this.#page * this.#perPage);
     for (const [label, tile] of this.#slots) {
-      // no tile for a free slot, or one showing yourself
-      const slot = this.#assigned.find((a) => a.videoLabel === label);
-      tile.hidden = !slot?.trackId || slot.trackId === this.myId;
-      tile.classList.toggle("pinned", !tile.hidden && slot.reserved);
+      // no tile for a free slot, one showing yourself, or one past this page
+      const at = this.#assigned.findIndex((a) => a.videoLabel === label);
+      const slot = this.#assigned[at];
+      tile.hidden = !slot?.trackId || slot.trackId === this.myId || (this.#people.size > 0 && at >= onPage);
+      // the server reserves every slot it fills: pinned is your choice, not its `reserved`
+      const pinned = !tile.hidden && slot.trackId === this.pinned;
+      tile.classList.toggle("pinned", pinned);
       if (tile.hidden) continue;
       count++;
       const { name = slot.trackId, micMuted, cameraOff } = this.#people.get(slot.trackId) ?? {};
       tile.classList.toggle("off", !!cameraOff);
       tile.querySelector(".initial").textContent = initial(name);
       const chip = tile.querySelector(".name");
-      chip.innerHTML = `${slot.reserved ? mark("pin", "Pinned") : ""}<span></span>${micMuted ? mark("mic-off", "Microphone off") : ""}`;
-      chip.querySelector("span").textContent = name;
+      chip.innerHTML = `${pinned ? mark("pin", "Pinned") : ""}<span class="who"></span>${micMuted ? mark("mic-off", "Microphone off") : ""}`;
+      chip.querySelector(".who").textContent = name;
     }
     grid.style.setProperty("--cols", Math.ceil(Math.sqrt(count)));
     grid.classList.toggle("solo", count === 1);

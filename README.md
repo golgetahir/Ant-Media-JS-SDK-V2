@@ -168,7 +168,7 @@ Run them from the repository:
 npm run examples
 ```
 
-This builds the SDK and starts Vite. Open `http://localhost:5173/examples/publish.html` (Vite prints the address). Pages served this way connect to `ws://localhost:5080/LiveApp/websocket`.
+This builds the SDK into `examples/sdk/` and starts Vite. Open `http://localhost:5173/examples/publish.html` (Vite prints the address). Pages served this way connect to `ws://localhost:5080/LiveApp/websocket`.
 
 Or copy them into a local Ant Media Server:
 
@@ -177,20 +177,29 @@ Or copy them into a local Ant Media Server:
 ./redeploy.sh LiveApp    # or name the apps
 ```
 
-The script builds the SDK and copies `dist/` and `examples/` into `$AMS_DIR/webapps/<app>/js-sdk/` (`AMS_DIR` defaults to `$HOME/softwares/ant-media-server`). Open `http://localhost:5080/LiveApp/js-sdk/examples/publish.html`. Pages served from an app connect to that app's websocket.
+The script builds the SDK into `examples/sdk/` and copies the contents of `examples/` into `$AMS_DIR/webapps/<app>/samples/` (`AMS_DIR` defaults to `$HOME/softwares/ant-media-server`). Open `http://localhost:5080/LiveApp/samples/index.html`. Pages served from an app connect to that app's websocket.
 
-On either setup, add `?websocketURL=wss://host:5443/App/websocket` to a page address to use another server.
+Or build an application WAR: StreamApp with the pages added under `samples/` (needs Maven):
+
+```bash
+npm run war
+```
+
+Upload `target/webrtc-sdk-samples.war` as a new application in the web panel, or run `create_app.sh -n <app> -p <AMS dir> -f <path to the war>` on the server. Open `http://<server>:5080/<app>/samples/index.html`.
+
+On any setup, add `?websocketURL=wss://host:5443/App/websocket` to a page address to use another server.
 
 ## Development
 
 | Command | What it does |
 | --- | --- |
 | `npm run build` | Clean `dist/` and compile with `tsc`. |
-| `npm run clean` | Remove `dist/`. |
+| `npm run clean` | Remove `dist/` and `examples/sdk/`. |
 | `npm run typecheck` | Type-check without writing files. |
 | `npm run lint` | ESLint over `src/`. `npm run lint:fix` fixes what it can. |
 | `npm test` | Run the Vitest suite once. `npm run test:watch` keeps it running. |
-| `npm run examples` | Build, then serve the example pages with Vite. |
+| `npm run examples` | Build into `examples/sdk/`, then serve the example pages with Vite. |
+| `npm run war` | Build into `examples/sdk/`, then package `target/webrtc-sdk-samples.war` with Maven. |
 | `npm run docs` | Generate the API reference into `docs/` with TypeDoc. |
 
 ## Documents

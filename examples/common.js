@@ -1,8 +1,8 @@
-import { getWebSocketURL } from "../dist/index.js";
+import { getWebSocketURL } from "./sdk/index.js";
 
 // Server for all example pages: ?websocketURL=... wins. Otherwise pages served from the repo
 // (npm run examples, under /examples/) use a local Ant Media Server, and pages deployed into
-// a server app (redeploy.sh) use that app.
+// a server app (/<app>/samples/, by redeploy.sh or the war) use that app.
 export const websocketURL =
   new URLSearchParams(location.search).get("websocketURL") ||
   (location.pathname.startsWith("/examples/")

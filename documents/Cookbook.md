@@ -155,6 +155,8 @@ await room.updateVideoTrackAssignments(4, 4); // participants 4 to 7, counting f
 await room.requestVideoTrackAssignments();    // ask for the current list
 ```
 
+`reserved` is the server's own flag: the server also sets it on the slots it fills when paging, so it does not mean pinned. Keep who you pinned yourself.
+
 To pin a participant, put their stream id on a video slot. Release the slot to let the server choose again:
 
 ```ts

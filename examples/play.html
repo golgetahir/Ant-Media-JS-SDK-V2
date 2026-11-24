@@ -80,7 +80,7 @@ await session.stop();
 </main>
 
 <script type="module">
-  import { WebRTCClient } from "../dist/index.js";
+  import { WebRTCClient } from "./sdk/index.js";
   import { websocketURL, explain, codeOf, logFailures } from "./common.js";
   import { onStateChange, isWaiting } from "./ui/session-element.js";
   import { fill } from "./ui/ams-devices.js";

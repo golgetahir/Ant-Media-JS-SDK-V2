@@ -106,7 +106,7 @@ await me.stop();
 </main>
 
 <script type="module">
-  import { WebRTCClient, generateRandomString } from "../dist/index.js";
+  import { WebRTCClient, generateRandomString } from "./sdk/index.js";
   import { websocketURL, streamLink, explain, codeOf, logFailures, cameraPreview } from "./common.js";
   import { copy } from "./ui/copy.js";
   import "./ui/ams-topbar.js";
@@ -163,10 +163,18 @@ await me.stop();
       return null;
     }
   };
+  // who you pinned: your choice, kept here; dropped when they leave, or you do
+  let pinned = "";
   function show() {
+    if (!participants.has(pinned)) pinned = "";
+    tiles.pinned = people.pinned = pinned;
     tiles.people = participants;
     people.people = participants;
   }
+  people.addEventListener("ams-pin", (e) => {
+    pinned = e.detail;
+    show();
+  });
 
   // asked again whenever someone comes or goes
   async function refresh() {
