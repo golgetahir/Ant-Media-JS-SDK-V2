@@ -66,27 +66,8 @@
       <div class="pane" data-tab="Stats"><ams-stats></ams-stats></div>
       <div class="pane" data-tab="Chat"><ams-chat></ams-chat></div>
       <div class="pane" data-tab="Code">
-        <ams-code>
-import { WebRTCClient } from
-  "@antmedia/webrtc-sdk";
-
-const client = new WebRTCClient({
-  websocketURL, localVideo,
-});
-// camera preview
-await client.media.initLocalStream();
-
-// returned at once: listen first
-const session = client.publish(
-  streamId, { token });
-session.on("reconnected", () =>
-  console.log("live again"));
-
-await session.ready(); // live
-await session.changeBandwidth(1500);
-await session.stop();
-        </ams-code>
-        <p class="hint">The SDK calls behind this page. Its controls are small components given the same client and session.</p>
+        <ams-code></ams-code>
+        <p class="hint">This page's own script, as it runs.</p>
       </div>
     </ams-tabs>
   </div>

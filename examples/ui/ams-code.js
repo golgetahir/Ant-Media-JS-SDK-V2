@@ -7,12 +7,19 @@ const escape = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").repla
 const highlight = (code) =>
   escape(code).replace(token, (m, c, s, k) => `<span class="${c ? "c" : s ? "s" : k ? "k" : "f"}">${m}</span>`);
 
-/** Shows its own text content as a code sample, highlighted, with a copy button. */
+// drop blank edge lines and the common indentation
+const dedent = (text) => {
+  const lines = text.replace(/^\s*\n|\s+$/g, "").split("\n");
+  const indent = Math.min(...lines.filter((l) => l.trim()).map((l) => l.match(/^\s*/)[0].length));
+  return lines.map((l) => l.slice(indent)).join("\n");
+};
+
+/** Shows the page's own module script as a code sample, highlighted, with a copy button. */
 class AmsCode extends HTMLElement {
   connectedCallback() {
     if (this.querySelector("pre")) return;
-    const code = this.textContent.trim();
-    this.innerHTML = `<pre class="code"><button class="mini copy" type="button" aria-label="Copy code">${icon("copy")}</button><code>${highlight(code)}</code></pre>`;
+    const code = dedent(document.querySelector('script[type="module"]').textContent);
+    this.innerHTML = `<button class="mini copy" type="button" aria-label="Copy code">${icon("copy")}</button><pre class="code"><code>${highlight(code)}</code></pre>`;
     this.querySelector("button").onclick = (e) => copy(e.currentTarget, code);
   }
 }

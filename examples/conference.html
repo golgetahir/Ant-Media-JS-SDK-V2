@@ -65,41 +65,8 @@
       </div>
       <div class="pane" data-tab="Devices"><ams-devices></ams-devices></div>
       <div class="pane" data-tab="Code">
-        <ams-code>
-import { WebRTCClient } from
-  "@antmedia/webrtc-sdk";
-
-const client = new WebRTCClient({
-  websocketURL, localVideo,
-});
-
-// publish into the room first: it
-// exists once someone publishes
-const me = client.publish(myId,
-  { roomId, streamName: "Alice" });
-await me.ready();
-
-// then play the room
-const room = client.play(roomId,
-  { roomId, userPublishId: myId });
-// tracks arrive per slot:
-// videoTrack0…, audioTrack0…
-room.on("newTrackAvailable",
-  ({ track, trackId }) => {
-    const slot = trackId.substring(7);
-    media(slot).srcObject =
-      new MediaStream([track]);
-  });
-// whose stream each slot shows
-room.on("video_track_assignments",
-  ({ payload }) => show(payload));
-await room.ready();
-
-// leave
-await room.stop();
-await me.stop();
-        </ams-code>
-        <p class="hint">The SDK calls behind this page. Its controls are small components given the same client and sessions.</p>
+        <ams-code></ams-code>
+        <p class="hint">This page's own script, as it runs.</p>
       </div>
     </ams-tabs>
   </div>

@@ -55,25 +55,8 @@
       <div class="pane" data-tab="Stats"><ams-stats viewer></ams-stats></div>
       <div class="pane" data-tab="Chat"><ams-chat></ams-chat></div>
       <div class="pane" data-tab="Code">
-        <ams-code>
-import { WebRTCClient } from
-  "@antmedia/webrtc-sdk";
-
-const client = new WebRTCClient({ websocketURL });
-
-// returned at once: listen first
-const session = client.play(
-  streamId, { token, remoteVideo });
-session.on("play_finished", () =>
-  console.log("source stopped, waiting"));
-
-await session.ready(); // playing
-const { streamInfo } =
-  await client.getStreamInfo(streamId);
-await session.forceStreamQuality(720);
-await session.stop();
-        </ams-code>
-        <p class="hint">The SDK calls behind this page. Its controls are small components given the same client and session.</p>
+        <ams-code></ams-code>
+        <p class="hint">This page's own script, as it runs.</p>
       </div>
     </ams-tabs>
   </div>

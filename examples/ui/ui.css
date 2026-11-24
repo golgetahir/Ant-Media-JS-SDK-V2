@@ -175,7 +175,7 @@ footer { margin-top: 64px; padding-top: 22px; border-top: 1px solid var(--border
 /* ---- publish page ---- */
 [data-theme="dark"] { color-scheme: dark; }
 [data-theme="light"] { color-scheme: light; }
-ams-state-pill, ams-session-rail, ams-event-log, ams-mic-button, ams-camera-button, ams-devices, ams-stats, ams-chat, ams-code,
+ams-state-pill, ams-session-rail, ams-event-log, ams-mic-button, ams-camera-button, ams-devices, ams-stats, ams-chat,
 ams-sound-button, ams-fullscreen-button, ams-people { display: contents; }
 .crumb { display: flex; align-items: center; gap: 10px; padding: 22px 0 16px; color: var(--muted); font-size: 14px; }
 .crumb a { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px 6px 8px; border-radius: 9px; }
@@ -320,10 +320,12 @@ ams-tabs { display: block; background: var(--surface); border: 1px solid var(--b
 .msg.file a { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0 4px; font-weight: 600; }
 .msg.file a span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .msg.file small { flex: none; font-weight: 400; opacity: .75; }
-.code { position: relative; margin: 0; padding: 16px; border-radius: 13px; background: #0b0c10; color: #e6e8ec; border: 1px solid rgba(255, 255, 255, .08); font-family: var(--mono); font-size: 12.5px; line-height: 1.7; overflow: auto; }
+.code { position: relative; margin: 0; padding: 16px; border-radius: 13px; background: #0b0c10; color: #e6e8ec; border: 1px solid rgba(255, 255, 255, .08); font-family: var(--mono); font-size: 12.5px; line-height: 1.7; overflow: auto; max-height: 60vh; color-scheme: dark; }
+/* the block scrolls inside the panel; the copy button stays put */
+ams-code { display: block; position: relative; min-width: 0; }
 .code .k { color: #ff8b8d; } .code .s { color: #86efac; } .code .c { color: #6b7280; } .code .f { color: #93c5fd; }
-.copy { position: absolute; top: 8px; right: 8px; color: #9aa1ad; }
-.copy:hover { background: rgba(255, 255, 255, .08); color: #fff; }
+.copy { position: absolute; top: 8px; right: 8px; z-index: 1; background: #0b0c10; color: #9aa1ad; }
+.copy:hover { background: #1c1e24; color: #fff; }
 
 /* ---- data channel page: the conversation where the other pages have the stage ---- */
 .talk { border-radius: 20px; overflow: hidden; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); }

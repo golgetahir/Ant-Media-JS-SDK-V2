@@ -60,32 +60,8 @@
         <p class="hint">Text and files travel over the stream's data channel, so the server application must have data channels enabled.</p>
       </div>
       <div class="pane" data-tab="Code">
-        <ams-code>
-import { WebRTCClient } from
-  "@antmedia/webrtc-sdk";
-
-const client =
-  new WebRTCClient({ websocketURL });
-
-// returned at once: listen first.
-// no camera or microphone is opened
-const session = client.publish(
-  channelId, { dataOnly: true });
-// to join: client.play(channelId)
-
-session.on("data_received",
-  ({ data }) => console.log(data));
-session.on("data_channel_opened",
-  async () => {
-    await session.sendData("hello");
-    await session.sendData(
-      await file.arrayBuffer());
-  });
-
-await session.ready(); // channel is up
-await session.stop();
-        </ams-code>
-        <p class="hint">The SDK calls behind this page. Its controls are small components given the same client and session.</p>
+        <ams-code></ams-code>
+        <p class="hint">This page's own script, as it runs.</p>
       </div>
     </ams-tabs>
   </div>
