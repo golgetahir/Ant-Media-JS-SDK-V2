@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Publish · Ant Media WebRTC SDK samples</title>
+<meta name="description" content="Go live from your camera, microphone or screen with the Ant Media WebRTC SDK.">
+<script src="ui/theme.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="ui/ui.css">
+</head>
+<body>
+<ams-topbar></ams-topbar>
+
+<main class="wrap">
+  <nav class="crumb" aria-label="Breadcrumb">
+    <a href="index.html"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Samples</a><span aria-hidden="true">/</span><h1>Publish</h1>
+  </nav>
+
+  <div class="studio">
+    <div>
+      <ams-stage>
+        <div class="overlay tl"><ams-state-pill></ams-state-pill></div>
+        <div class="overlay tr"><span class="glass mono" id="format" hidden></span></div>
+        <div class="overlay bl"><span class="glass mono" id="sid-tag"></span></div>
+        <div class="dock">
+          <ams-mic-button></ams-mic-button>
+          <ams-camera-button></ams-camera-button>
+          <ams-screen-button></ams-screen-button>
+          <button class="ctl" id="open-devices" type="button" aria-label="Devices" title="Devices"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button>
+          <span class="sep"></span>
+          <button class="go" id="go" type="button">Go live</button>
+        </div>
+      </ams-stage>
+      <ams-session-rail></ams-session-rail>
+      <ams-event-log></ams-event-log>
+    </div>
+
+    <ams-tabs>
+      <div class="pane" data-tab="Stream">
+        <div class="field"><label for="sid">Stream ID</label>
+          <div class="input"><input id="sid" class="mono" spellcheck="false" autocomplete="off">
+            <button class="mini" id="regen" type="button" aria-label="New stream ID" title="New stream ID"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button></div></div>
+        <div class="field"><label for="token">Token <span>(optional)</span></label>
+          <div class="input"><input id="token" placeholder="Only if the app requires one" spellcheck="false" autocomplete="off"></div></div>
+        <div class="field"><label for="watch">Watch link</label>
+          <div class="input"><input id="watch" class="mono" readonly>
+            <button class="mini" id="copy-watch" type="button" aria-label="Copy watch link" title="Copy"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button>
+            <a class="mini" id="open-watch" target="_blank" rel="noopener" aria-label="Open watch link in a new tab" title="Open in a new tab"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a></div>
+          <p class="hint">Open it in another tab or send it to a viewer.</p></div>
+        <details class="advanced"><summary>Advanced</summary>
+          <div class="group">
+            <div class="field"><label for="bitrate">Video bitrate cap <span>(kbps, empty for none)</span></label>
+              <div class="input"><input id="bitrate" type="number" min="100" step="100" placeholder="Unlimited"></div></div>
+            <div class="field"><label for="degradation">Degradation preference</label>
+              <div class="input"><select id="degradation" class="mono">
+                <option>balanced</option><option>maintain-framerate</option><option>maintain-resolution</option>
+              </select><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></div></div>
+            <p class="hint">Applied when the stream goes live, and at once while it is live.</p>
+          </div>
+        </details>
+      </div>
+      <div class="pane" data-tab="Devices"><ams-devices></ams-devices></div>
+      <div class="pane" data-tab="Stats"><ams-stats></ams-stats></div>
+      <div class="pane" data-tab="Chat"><ams-chat></ams-chat></div>
+      <div class="pane" data-tab="Code">
+        <ams-code>
+import { WebRTCClient } from
+  "@antmedia/webrtc-sdk";
+
+const client = new WebRTCClient({
+  websocketURL, localVideo,
+});
+// camera preview
+await client.media.initLocalStream();
+
+// returned at once: listen first
+const session = client.publish(
+  streamId, { token });
+session.on("reconnected", () =>
+  console.log("live again"));
+
+await session.ready(); // live
+await session.changeBandwidth(1500);
+await session.stop();
+        </ams-code>
+        <p class="hint">The SDK calls behind this page. Its controls are small components given the same client and session.</p>
+      </div>
+    </ams-tabs>
+  </div>
+</main>
+
+<script type="module">
+  import { WebRTCClient, generateRandomString } from "../dist/index.js";
+  import { websocketURL, streamLink } from "./common.js";
+  import { onStateChange } from "./ui/session-element.js";
+  import { copy } from "./ui/copy.js";
+  import "./ui/ams-topbar.js";
+  import "./ui/ams-stage.js";
+  import "./ui/ams-state-pill.js";
+  import "./ui/ams-toggle-buttons.js";
+  import "./ui/ams-screen-button.js";
+  import "./ui/ams-session-rail.js";
+  import "./ui/ams-event-log.js";
+  import "./ui/ams-tabs.js";
+  import "./ui/ams-devices.js";
+  import "./ui/ams-stats.js";
+  import "./ui/ams-chat.js";
+  import "./ui/ams-code.js";
+
+  const $ = (selector) => document.querySelector(selector);
+  const [stage, tabs, log, stats, go, sid, token, watch, bitrate, degradation, format, tag] = [
+    "ams-stage", "ams-tabs", "ams-event-log", "ams-stats", "#go", "#sid", "#token", "#watch", "#bitrate", "#degradation", "#format", "#sid-tag",
+  ].map($);
+
+  const client = new WebRTCClient({ websocketURL, localVideo: stage.video });
+  window.adaptor = client;
+  for (const control of document.querySelectorAll("ams-mic-button, ams-camera-button, ams-screen-button, ams-devices")) {
+    control.client = client;
+  }
+
+  // plain words for the codes the camera or a start fail with
+  const problems = {
+    NotAllowedError: "Permission was denied",
+    NotFoundError: "No camera or microphone was found",
+    NotReadableError: "The camera or microphone is in use by another app",
+    OverconstrainedError: "The camera cannot give the requested format",
+    WebSocketNotConnected: "The server could not be reached",
+    timeout: "The server did not confirm the stream in time",
+    unauthorized_access: "The server refused the token",
+    streamIdInUse: "This stream ID is already in use",
+    session_not_live: "The stream is not live yet",
+    data_channel_not_available: "The data channel is not open",
+  };
+  const explain = (code, fallback) => `${problems[code] ?? fallback} (${code})`;
+
+  // failures in the event log: the components' actions, and client errors no session hears
+  const logFailure = (code, action) => log.add(code, [action, problems[code]].filter(Boolean).join(": "));
+  // an SDKError's code, else the browser error's name (a DOMException's own code is a number)
+  const codeOf = (error) => (typeof error.code === "string" ? error.code : error.name);
+  document.addEventListener("ams-failure", ({ detail: { action, error } }) => logFailure(codeOf(error), action));
+  client.on("error", ({ error, streamId }) => streamId || logFailure(error));
+
+  // ---- camera preview: the picture, its mirror and the format chip follow the local tracks
+  async function preview() {
+    stage.setPlaceholder("Opening your camera…");
+    try {
+      await client.media.initLocalStream();
+      showPicture();
+    } catch (e) {
+      stage.setPlaceholder(explain(e.name, "The camera could not be opened"), { label: "Retry", run: preview });
+    }
+  }
+  const videoSettings = () => client.media.getLocalStream()?.getVideoTracks()[0]?.getSettings() ?? {};
+  function showPicture() {
+    const { cameraOff, screenSharing } = client.media;
+    // without a stream the placeholder keeps saying why
+    if (!client.media.getLocalStream()) return;
+    stage.setPlaceholder(cameraOff && !screenSharing ? "Camera is off" : null);
+    stage.video.classList.toggle("mirror", !screenSharing);
+    showFormat(videoSettings());
+  }
+  function showFormat({ width, height, frameRate }) {
+    format.hidden = !width;
+    format.textContent = `${width} × ${height}` + (frameRate >= 0 ? ` · ${Math.round(frameRate)} fps` : "");
+  }
+  client.on("local_tracks_changed", showPicture);
+  stats.addEventListener("sample", (e) => showFormat(e.detail));
+
+  // ---- stream id and watch link
+  const newId = () => `stream_${generateRandomString(6)}`;
+  function showId() {
+    const id = sid.value.trim();
+    tag.textContent = id;
+    tag.hidden = !id;
+    watch.value = new URL(streamLink("play.html", id), location.href).href;
+    $("#open-watch").href = watch.value;
+    paint();
+  }
+  sid.oninput = showId;
+  $("#regen").onclick = () => {
+    sid.value = newId();
+    showId();
+  };
+  $("#copy-watch").onclick = (e) => copy(e.currentTarget, watch.value);
+  $("#open-devices").onclick = () => tabs.open("Devices", true);
+
+  // ---- the session
+  const views = document.querySelectorAll("ams-state-pill, ams-session-rail, ams-event-log, ams-stats, ams-chat");
+  let session = null;
+  let stopPainting = () => {};
+  const active = () => !!session && session.state !== "ended";
+
+  function paint() {
+    go.textContent = active() ? "End stream" : "Go live";
+    go.classList.toggle("end", active());
+    go.disabled = !active() && !sid.value.trim();
+    for (const input of [sid, token, $("#regen")]) input.disabled = active();
+    if (!active()) showFormat(videoSettings());
+  }
+
+  async function goLive() {
+    const id = sid.value.trim();
+    log.add("publish()", id);
+    session = window.session = client.publish(id, { token: token.value.trim() || undefined });
+    stopPainting();
+    stopPainting = onStateChange(session, paint);
+    views.forEach((view) => (view.session = session));
+    showPicture();
+    paint();
+    try {
+      await session.ready();
+    } catch (e) {
+      log.add("ready() rejected", e.code);
+      // End stream during the start cancels it: nothing went wrong
+      if (e.code !== "stream_stopped") {
+        stage.setPlaceholder(explain(e.code, "The stream could not start"), { label: "Retry", run: goLive });
+      }
+      return;
+    }
+    showPicture(); // the publish opened the camera itself if the preview could not
+    applyAdvanced();
+  }
+  go.onclick = () => (active() ? session.stop() : goLive());
+
+  // ---- advanced: applied when the stream goes live, and at once while it is
+  async function applyAdvanced() {
+    if (session?.state !== "live" && session?.state !== "reconnecting") return;
+    const kbps = Number(bitrate.value);
+    try {
+      await session.changeBandwidth(kbps > 0 ? kbps : "unlimited");
+      await session.setDegradationPreference(degradation.value);
+    } catch (e) {
+      logFailure(e.code, "Advanced settings");
+    }
+  }
+  bitrate.onchange = degradation.onchange = applyAdvanced;
+
+  sid.value = new URLSearchParams(location.search).get("id") || newId();
+  showId();
+  preview();
+</script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Play · Ant Media WebRTC SDK samples</title>
+<meta name="description" content="Watch a stream with sub-second delay and pick its quality with the Ant Media WebRTC SDK.">
+<script src="ui/theme.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="ui/ui.css">
+</head>
+<body>
+<ams-topbar></ams-topbar>
+
+<main class="wrap">
+  <nav class="crumb" aria-label="Breadcrumb">
+    <a href="index.html"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Samples</a><span aria-hidden="true">/</span><h1>Play</h1>
+  </nav>
+
+  <div class="studio">
+    <div>
+      <ams-stage remote>
+        <div class="veil" id="waiting" hidden>
+          <span class="avatar"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+          <p>The stream stopped. It plays again here as soon as it is back.</p>
+        </div>
+        <div class="overlay tl"><ams-state-pill></ams-state-pill></div>
+        <div class="overlay tr"><span class="glass mono" id="format" hidden></span></div>
+        <div class="overlay bl"><span class="glass mono" id="sid-tag"></span></div>
+        <div class="dock">
+          <ams-sound-button></ams-sound-button>
+          <ams-quality-button></ams-quality-button>
+          <ams-fullscreen-button></ams-fullscreen-button>
+          <span class="sep"></span>
+          <button class="go" id="go" type="button">Play</button>
+        </div>
+      </ams-stage>
+      <ams-session-rail></ams-session-rail>
+      <ams-event-log></ams-event-log>
+    </div>
+
+    <ams-tabs>
+      <div class="pane" data-tab="Stream">
+        <div class="field"><label for="sid">Stream ID</label>
+          <div class="input"><input id="sid" class="mono" spellcheck="false" autocomplete="off"></div></div>
+        <div class="field"><label for="token">Token <span>(optional)</span></label>
+          <div class="input"><input id="token" placeholder="Only if the app requires one" spellcheck="false" autocomplete="off"></div></div>
+        <div class="field"><label for="volume">Volume</label>
+          <input id="volume" class="range" type="range" min="0" max="1" step="0.05" value="1"></div>
+        <div class="field" id="speaker-field" hidden><label for="speaker">Speaker</label>
+          <div class="input"><select id="speaker"></select><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></div></div>
+      </div>
+      <div class="pane" data-tab="Stats"><ams-stats viewer></ams-stats></div>
+      <div class="pane" data-tab="Chat"><ams-chat></ams-chat></div>
+      <div class="pane" data-tab="Code">
+        <ams-code>
+import { WebRTCClient } from
+  "@antmedia/webrtc-sdk";
+
+const client = new WebRTCClient({ websocketURL });
+
+// returned at once: listen first
+const session = client.play(
+  streamId, { token, remoteVideo });
+session.on("play_finished", () =>
+  console.log("source stopped, waiting"));
+
+await session.ready(); // playing
+const { streamInfo } =
+  await client.getStreamInfo(streamId);
+await session.forceStreamQuality(720);
+await session.stop();
+        </ams-code>
+        <p class="hint">The SDK calls behind this page. Its controls are small components given the same client and session.</p>
+      </div>
+    </ams-tabs>
+  </div>
+</main>
+
+<script type="module">
+  import { WebRTCClient } from "../dist/index.js";
+  import { websocketURL } from "./common.js";
+  import { onStateChange, isWaiting } from "./ui/session-element.js";
+  import { fill } from "./ui/ams-devices.js";
+  import "./ui/ams-topbar.js";
+  import "./ui/ams-stage.js";
+  import "./ui/ams-state-pill.js";
+  import "./ui/ams-sound-button.js";
+  import "./ui/ams-quality-button.js";
+  import "./ui/ams-fullscreen-button.js";
+  import "./ui/ams-session-rail.js";
+  import "./ui/ams-event-log.js";
+  import "./ui/ams-tabs.js";
+  import "./ui/ams-stats.js";
+  import "./ui/ams-chat.js";
+  import "./ui/ams-code.js";
+
+  const $ = (selector) => document.querySelector(selector);
+  const [stage, log, stats, go, sid, token, volume, speaker, format, tag, waiting] = [
+    "ams-stage", "ams-event-log", "ams-stats", "#go", "#sid", "#token", "#volume", "#speaker", "#format", "#sid-tag", "#waiting",
+  ].map($);
+  const video = stage.video;
+
+  // no localVideo and no publish: this page never opens the camera or microphone
+  const client = new WebRTCClient({ websocketURL });
+  window.adaptor = client;
+  $("ams-sound-button").video = video;
+  $("ams-quality-button").client = client;
+
+  // plain words for the codes a start or an action fails with
+  const problems = {
+    WebSocketNotConnected: "The server could not be reached",
+    timeout: "The server did not start the stream in time",
+    unauthorized_access: "The server refused the token",
+    no_stream_exist: "The stream is not live",
+    streamIdInUse: "This stream is already playing here",
+    session_not_live: "The stream is not playing yet",
+    data_channel_not_available: "The data channel is not open",
+  };
+  const explain = (code, fallback) => `${problems[code] ?? fallback} (${code})`;
+
+  // failures in the event log: the components' actions, and client errors no session hears
+  const logFailure = (code, action) => log.add(code, [action, problems[code]].filter(Boolean).join(": "));
+  // an SDKError's code, else the browser error's name (a DOMException's own code is a number)
+  const codeOf = (error) => (typeof error.code === "string" ? error.code : error.name);
+  document.addEventListener("ams-failure", ({ detail: { action, error } }) => logFailure(codeOf(error), action));
+  client.on("error", ({ error, streamId }) => streamId || logFailure(error));
+
+  // ---- the picture's format chip, from the stats samples
+  stats.addEventListener("sample", ({ detail: { width, height, frameRate } }) => {
+    format.hidden = !width;
+    format.textContent = `${width} × ${height}` + (frameRate >= 0 ? ` · ${Math.round(frameRate)} fps` : "");
+  });
+
+  // ---- sound: volume, and the speaker when the browser lists more than one
+  volume.oninput = () => (video.volume = Number(volume.value));
+  // a refused speaker arrives as a client error
+  speaker.onchange = () => client.media.setAudioOutput(speaker.value, video).catch((e) => logFailure(codeOf(e), "setAudioOutput()"));
+  client.on("devices_updated", ({ audioOutputs, selectedAudioOutputId }) => {
+    fill(speaker, audioOutputs, selectedAudioOutputId, "Speaker");
+    $("#speaker-field").hidden = audioOutputs.length < 2;
+  });
+  const listDevices = () => client.media.listDevices().catch((e) => logFailure(codeOf(e), "listDevices()"));
+  navigator.mediaDevices?.addEventListener("devicechange", listDevices);
+  listDevices();
+
+  // ---- the session
+  const views = document.querySelectorAll("ams-state-pill, ams-session-rail, ams-event-log, ams-stats, ams-chat, ams-quality-button");
+  let session = null;
+  let failure = null;
+  let stopPainting = () => {};
+  const active = () => !!session && session.state !== "ended";
+
+  function paint() {
+    const id = sid.value.trim();
+    const on = active();
+    go.textContent = on ? "Stop" : "Play";
+    go.classList.toggle("end", on);
+    go.disabled = !on && !id;
+    sid.disabled = token.disabled = on;
+    tag.textContent = id;
+    tag.hidden = !id;
+    waiting.hidden = !isWaiting(session);
+    if (!on || isWaiting(session)) format.hidden = true;
+    if (on) stage.setPlaceholder(session.state === "starting" ? `Connecting to ${session.streamId}…` : null);
+    else if (failure) stage.setPlaceholder(failure, { label: "Retry", run: play });
+    else if (id) stage.setPlaceholder(`Watch ${id} with sub-second delay`, { label: "Play", run: play, icon: "play" });
+    else stage.setPlaceholder("Type the ID of a live stream to watch it");
+  }
+
+  async function play() {
+    const id = sid.value.trim();
+    failure = null;
+    log.add("play()", id);
+    session = window.session = client.play(id, { token: token.value.trim() || undefined, remoteVideo: video });
+    stopPainting();
+    stopPainting = onStateChange(session, paint);
+    views.forEach((view) => (view.session = session));
+    paint();
+    try {
+      await session.ready();
+    } catch (e) {
+      log.add("ready() rejected", e.code);
+      // Stop during the start cancels it: nothing went wrong
+      if (e.code !== "stream_stopped") failure = explain(e.code, "The stream could not start");
+      paint();
+    }
+  }
+  go.onclick = () => (active() ? session.stop() : play());
+  sid.oninput = () => {
+    failure = null;
+    paint();
+  };
+
+  // opened with ?id= (the publish page's watch link): play at once
+  const linked = new URLSearchParams(location.search).get("id");
+  sid.value = linked ?? "stream1";
+  paint();
+  if (linked) play();
+</script>
+</body>
+</html>

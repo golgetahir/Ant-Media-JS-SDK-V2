@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ant Media WebRTC SDK samples</title>
+<meta name="description" content="Samples for the Ant Media WebRTC SDK: publish, play, conference and data channel pages you can open, run and read.">
+<script src="ui/theme.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="ui/ui.css">
+</head>
+<body>
+<ams-topbar></ams-topbar>
+
+<main class="wrap">
+  <section class="hero">
+    <span class="eyebrow">WebRTC SDK v2 · Samples</span>
+    <h1>Live video, <em>a few lines</em> at a time.</h1>
+    <p>Each sample is assembled from the same small components. Open one, go live, then read the code that runs it.</p>
+    <div class="cta">
+      <a class="btn primary" href="publish.html">Start publishing <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      <a class="btn" href="play.html">Watch a stream</a>
+    </div>
+  </section>
+
+  <div class="section-h"><h2>Essentials</h2><span>The four things every app starts with</span></div>
+  <div class="grid" data-section="essentials"></div>
+
+  <div class="section-h"><h2>Demos</h2><span>Complete use cases, coming next</span></div>
+  <div class="grid" data-section="demos"></div>
+
+  <footer>Ant Media WebRTC SDK v2</footer>
+</main>
+
+<script type="module">
+  import { samples } from "./samples.js";
+  import "./ui/ams-topbar.js";
+  import "./ui/ams-sample-card.js";
+
+  for (const grid of document.querySelectorAll(".grid[data-section]")) {
+    for (const sample of samples.filter((s) => s.section === grid.dataset.section)) {
+      grid.append(Object.assign(document.createElement("ams-sample-card"), { sample }));
+    }
+  }
+</script>
+</body>
+</html>
