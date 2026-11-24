@@ -18,6 +18,7 @@ export type ErrorCode =
   | "data_channel_error"
   | "data_channel_blob_parse_failed"
   | "data_channel_not_available"
+  | "data_too_large"
   | "set_sink_id_failed"
   | "set_sink_id_unsupported"
   | "session_ended"

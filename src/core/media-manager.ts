@@ -17,6 +17,8 @@ export class MediaManager extends Emitter<EventMap> {
   private screenVideoTrack: MediaStreamTrack | null = null;
   private screenShareAudioTrack: MediaStreamTrack | null = null;
   private cameraOverlayTrack: MediaStreamTrack | null = null;
+  // the overlay's inset element, drawn from cameraOverlayTrack
+  private overlayCamVideo: HTMLVideoElement | null = null;
   private overlayTimer: ReturnType<typeof setInterval> | null = null;
   private selectedVideoInputId: string | null = null;
   private selectedAudioInputId: string | null = null;
@@ -167,8 +169,22 @@ export class MediaManager extends Emitter<EventMap> {
     try {
       // no stream yet: it opens on the selection
       if (await this.ensureLocalStream()) return;
-      // camera off or screen shared: restoreCameraVideoTrack applies the selection later
-      if (!this.cameraDisabled && !this.screenVideoTrack) {
+      // overlay share: its camera switches now, off or not (the draw loop leaves it out while off);
+      // camera off or plain screen share: restoreCameraVideoTrack applies the selection later
+      const inset = this.overlayCamVideo;
+      if (inset) {
+        const cam = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+        const vtrack = cam.getVideoTracks()[0];
+        if (vtrack && inset === this.overlayCamVideo) {
+          inset.srcObject = new MediaStream([vtrack]);
+          void inset.play().catch(() => {});
+          this.cameraOverlayTrack?.stop();
+          this.cameraOverlayTrack = vtrack;
+        } else {
+          // the share ended meanwhile: nothing would draw it
+          vtrack?.stop();
+        }
+      } else if (!this.cameraDisabled && !this.screenVideoTrack) {
         const cam = await navigator.mediaDevices.getUserMedia({ video, audio: false });
         const vtrack = cam.getVideoTracks()[0];
         if (vtrack) this.setLocalTrack(vtrack);
@@ -403,6 +419,20 @@ export class MediaManager extends Emitter<EventMap> {
       // ignore
     }
     this.screenVideoTrack = null;
+    // camera overlay share: stop its draw loop and inset camera
+    if (this.overlayTimer) {
+      clearInterval(this.overlayTimer);
+      this.overlayTimer = null;
+    }
+    this.overlayCamVideo = null;
+    if (this.cameraOverlayTrack) {
+      try {
+        this.cameraOverlayTrack.stop();
+      } catch {
+        // ignore
+      }
+      this.cameraOverlayTrack = null;
+    }
     if (this.screenShareAudioTrack) {
       try {
         this.screenShareAudioTrack.stop();
@@ -463,7 +493,7 @@ export class MediaManager extends Emitter<EventMap> {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     const screenVideo = document.createElement("video");
-    const camVideo = document.createElement("video");
+    const camVideo = (this.overlayCamVideo = document.createElement("video"));
     screenVideo.srcObject = new MediaStream([screenTrack]);
     camVideo.srcObject = camTrack ? new MediaStream([camTrack]) : null;
     screenVideo.muted = true;
@@ -501,28 +531,8 @@ export class MediaManager extends Emitter<EventMap> {
   }
 
   /** Stop screen+camera overlay and restore camera. */
-  async stopScreenWithCameraOverlay(): Promise<void> {
-    // no share: nothing to restore
-    if (!this.screenVideoTrack) return;
-    if (this.overlayTimer) {
-      clearInterval(this.overlayTimer);
-      this.overlayTimer = null;
-    }
-    try {
-      this.screenVideoTrack.stop();
-    } catch {
-      // ignore
-    }
-    this.screenVideoTrack = null;
-    if (this.cameraOverlayTrack) {
-      try {
-        this.cameraOverlayTrack.stop();
-      } catch {
-        // ignore
-      }
-      this.cameraOverlayTrack = null;
-    }
-    await this.restoreCameraVideoTrack();
+  stopScreenWithCameraOverlay(): Promise<void> {
+    return this.stopScreenShare();
   }
 
   // ===== Audio utilities (parity) =====
@@ -539,6 +549,8 @@ export class MediaManager extends Emitter<EventMap> {
   private stopMutedProbe: (() => void) | null = null;
   private lastVolume = 1;
   private gainInputStream: MediaStream | null = null;
+  // source of the volume chain, released on rebuild
+  private gainSourceNode: MediaStreamAudioSourceNode | null = null;
   // extra mic captured for mixing with screen-share system audio
   private mixMicStream: MediaStream | null = null;
 
@@ -566,14 +578,16 @@ export class MediaManager extends Emitter<EventMap> {
     });
     // release the previous mic only once the new one opened: a failure keeps the audio going
     for (const t of this.gainInputStream?.getTracks() ?? []) t.stop();
+    this.gainSourceNode?.disconnect();
+    this.primaryGainNode?.disconnect();
     this.gainInputStream = mic;
     if (!this.audioContext) this.audioContext = new AudioContext();
     const ctx = this.audioContext;
-    const source = ctx.createMediaStreamSource(mic);
+    this.gainSourceNode = ctx.createMediaStreamSource(mic);
     const destination = ctx.createMediaStreamDestination();
     this.primaryGainNode = ctx.createGain();
     this.primaryGainNode.gain.value = this.lastVolume;
-    source.connect(this.primaryGainNode).connect(destination);
+    this.gainSourceNode.connect(this.primaryGainNode).connect(destination);
     const processedTrack = destination.stream.getAudioTracks()[0];
     if (processedTrack) this.setLocalTrack(processedTrack);
   }
@@ -705,6 +719,7 @@ export class MediaManager extends Emitter<EventMap> {
 
   /** Release every track, timer, listener and audio context this manager holds. Idempotent. */
   dispose(): void {
+    const released = !!this.localStream;
     this.disableAudioLevelForLocalStream();
     this.disableAudioLevelWhenMuted();
     this.clearBlackVideoTrackTimer();
@@ -734,6 +749,7 @@ export class MediaManager extends Emitter<EventMap> {
     this.screenVideoTrack = null;
     this.screenShareAudioTrack = null;
     this.cameraOverlayTrack = null;
+    this.overlayCamVideo = null;
     try {
       this.audioContext?.close().catch(() => {
         // ignore
@@ -742,6 +758,7 @@ export class MediaManager extends Emitter<EventMap> {
       // ignore
     }
     this.audioContext = null;
+    this.gainSourceNode = null;
     this.primaryGainNode = null;
     this.secondaryGainNode = null;
     try {
@@ -750,6 +767,8 @@ export class MediaManager extends Emitter<EventMap> {
       // ignore without mediaDevices
     }
     if (this.localVideo) this.localVideo.srcObject = null;
+    // controls showing the local tracks repaint from the released state
+    if (released) this.emit("local_tracks_changed", undefined);
   }
 
   /** Single track-swap point: applies stored pause state, keeps one track per kind, notifies. */

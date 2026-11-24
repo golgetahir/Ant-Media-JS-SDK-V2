@@ -31,7 +31,7 @@ let enumerateDevices: ReturnType<typeof vi.fn>;
 let addEventListener: ReturnType<typeof vi.fn>;
 let removeEventListener: ReturnType<typeof vi.fn>;
 let acquired: MockStream[];
-let gains: Array<{ gain: { value: number } }>;
+let gains: Array<{ gain: { value: number }; disconnect: ReturnType<typeof vi.fn> }>;
 let createMediaStreamSource: ReturnType<typeof vi.fn>;
 let closeContext: ReturnType<typeof vi.fn>;
 let sources: Array<{ disconnect: ReturnType<typeof vi.fn> }>;
@@ -78,7 +78,7 @@ describe('media-manager fixes', () => {
       close: closeContext,
       createMediaStreamSource,
       createGain: vi.fn(() => {
-        const g = { gain: { value: 1 }, connect: (n: unknown) => n };
+        const g = { gain: { value: 1 }, connect: (n: unknown) => n, disconnect: vi.fn() };
         gains.push(g);
         return g;
       }),
@@ -239,6 +239,28 @@ describe('media-manager fixes', () => {
     expect(getUserMedia).toHaveBeenCalledWith({ video: true, audio: false });
   });
 
+  it('stopScreenShare during a camera overlay share also ends the overlay', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const mm = new MediaManager({ mediaConstraints: { audio: true, video: true } });
+    await mm.initLocalStream();
+    await mm.startScreenWithCameraOverlay();
+    const overlayCam = (mm as any).cameraOverlayTrack as MockTrack;
+    expect(vi.getTimerCount()).toBe(1);
+
+    await mm.stopScreenShare();
+
+    expect(overlayCam.stop).toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+    // a later camera switch takes the plain camera path, not the overlay's
+    getUserMedia.mockClear();
+    await mm.selectVideoInput('cam-2');
+    const cam = acquired[acquired.length - 1].getVideoTracks()[0];
+    expect(getUserMedia.mock.calls).toEqual([[{ video: { deviceId: { exact: 'cam-2' } }, audio: false }]]);
+    expect(mm.getLocalStream()!.getVideoTracks()).toEqual([cam]);
+    expect((mm as any).cameraOverlayTrack).toBeNull();
+    mm.dispose();
+  });
+
   it('honors the selected camera when restoring after screen share', async () => {
     const mm = new MediaManager({ mediaConstraints: { audio: true, video: true } });
     await mm.initLocalStream();
@@ -335,6 +357,65 @@ describe('media-manager fixes', () => {
     expect(getUserMedia).not.toHaveBeenCalled();
     expect(mm.getLocalStream()!.getVideoTracks()).toHaveLength(1);
     expect(mm.getLocalStream()!.getVideoTracks()[0]).toBe(screen);
+
+    // applies when the share ends
+    await mm.stopScreenShare();
+    expect(getUserMedia.mock.calls).toEqual([[{ video: { deviceId: { exact: 'cam-2' } }, audio: false }]]);
+    mm.dispose();
+  });
+
+  // the overlay's camera element: the last video element startScreenWithCameraOverlay created
+  const overlayInset = (createElement: ReturnType<typeof vi.spyOn>) =>
+    createElement.mock.results.filter((_, i) => createElement.mock.calls[i][0] === 'video').pop()!.value;
+
+  for (const off of [false, true]) {
+    it(`selectVideoInput during a camera overlay share switches the inset camera at once (camera off: ${off})`, async () => {
+      const mm = new MediaManager({ mediaConstraints: { audio: true, video: true } });
+      await mm.initLocalStream();
+      const createElement = vi.spyOn(document, 'createElement');
+      await mm.startScreenWithCameraOverlay();
+      const inset = overlayInset(createElement);
+      const oldCam = (mm as any).cameraOverlayTrack as MockTrack;
+      const shared = mm.getLocalStream()!.getVideoTracks()[0];
+      if (off) mm.turnOffLocalCamera();
+      getUserMedia.mockClear();
+
+      await mm.selectVideoInput('cam-2');
+
+      expect(getUserMedia.mock.calls).toEqual([[{ video: { deviceId: { exact: 'cam-2' } }, audio: false }]]);
+      const newCam = acquired[acquired.length - 1].getVideoTracks()[0] as unknown as MockTrack;
+      expect(oldCam.stop).toHaveBeenCalled();
+      expect(newCam.stop).not.toHaveBeenCalled();
+      expect((mm as any).cameraOverlayTrack).toBe(newCam);
+      expect(inset.srcObject.getVideoTracks()).toEqual([newCam]);
+      // still sending the composed canvas
+      expect(mm.getLocalStream()!.getVideoTracks()).toEqual([shared]);
+
+      // ending the share releases the new overlay camera and brings the camera back on the new device
+      getUserMedia.mockClear();
+      await mm.stopScreenWithCameraOverlay();
+      expect(newCam.stop).toHaveBeenCalled();
+      expect(getUserMedia.mock.calls).toEqual(off ? [] : [[{ video: { deviceId: { exact: 'cam-2' } }, audio: false }]]);
+      mm.dispose();
+    });
+  }
+
+  it('selectVideoInput during a camera overlay share that cannot open the camera keeps the old one', async () => {
+    const mm = new MediaManager({ mediaConstraints: { audio: true, video: true } });
+    await mm.initLocalStream();
+    await mm.selectVideoInput('cam-1');
+    const createElement = vi.spyOn(document, 'createElement');
+    await mm.startScreenWithCameraOverlay();
+    const inset = overlayInset(createElement);
+    const oldCam = (mm as any).cameraOverlayTrack as MockTrack;
+    getUserMedia.mockRejectedValueOnce(new Error('busy'));
+
+    await expect(mm.selectVideoInput('cam-2')).rejects.toThrow('busy');
+    expect(oldCam.stop).not.toHaveBeenCalled();
+    expect((mm as any).cameraOverlayTrack).toBe(oldCam);
+    expect(inset.srcObject.getVideoTracks()).toEqual([oldCam]);
+    expect((await mm.listDevices()).selectedVideoInputId).toBe('cam-1');
+    mm.dispose();
   });
 
   it('restores the camera on the senders when the browser ends the screen share', async () => {
@@ -378,6 +459,11 @@ describe('media-manager fixes', () => {
     expect(gains[1].gain.value).toBe(0.3);
     expect(createMediaStreamSource).toHaveBeenLastCalledWith(mic);
     expect(mm.getLocalStream()!.getAudioTracks()).not.toContain(mic.getAudioTracks()[0]);
+    // the first chain is released, the new one stays connected
+    expect(sources[0].disconnect).toHaveBeenCalled();
+    expect(gains[0].disconnect).toHaveBeenCalled();
+    expect(sources[1].disconnect).not.toHaveBeenCalled();
+    expect(gains[1].disconnect).not.toHaveBeenCalled();
   });
 
   it('keeps the volume chain on the old mic when the new mic cannot be opened', async () => {
@@ -392,6 +478,8 @@ describe('media-manager fixes', () => {
     await settle();
     expect(oldMic.stop).not.toHaveBeenCalled();
     expect(mm.getLocalStream()!.getAudioTracks()).toEqual([sent]);
+    expect(sources[0].disconnect).not.toHaveBeenCalled();
+    expect(gains[0].disconnect).not.toHaveBeenCalled();
   });
 
   it('runs the muted probe and the local meter independently', async () => {
@@ -444,6 +532,42 @@ describe('media-manager fixes', () => {
 
     expect(() => mm.dispose()).not.toThrow();
     expect(closeContext).toHaveBeenCalledTimes(1);
+  });
+
+  it('initLocalStream after dispose opens a fresh stream with the stored choices', async () => {
+    const localVideo = { srcObject: null } as unknown as HTMLVideoElement;
+    const mm = new MediaManager({ mediaConstraints: { audio: true, video: true }, localVideo });
+    await mm.initLocalStream();
+    const first = mm.getLocalStream();
+    mm.muteLocalMic();
+    mm.dispose();
+
+    await mm.initLocalStream();
+
+    const s = mm.getLocalStream()!;
+    expect(s).not.toBe(first);
+    expect([s.getVideoTracks().length, s.getAudioTracks().length]).toEqual([1, 1]);
+    expect((s.getTracks() as unknown as MockTrack[]).filter(t => t.stop.mock.calls.length)).toEqual([]);
+    expect(s.getAudioTracks()[0].enabled).toBe(false);
+    expect(localVideo.srcObject).toBe(s);
+    mm.dispose();
+  });
+
+  it('dispose emits local_tracks_changed once it released a local stream', async () => {
+    const mm = new MediaManager({ mediaConstraints: { audio: true, video: true } });
+    const seen: Array<[boolean, boolean]> = [];
+    mm.on('local_tracks_changed', () => seen.push([mm.getLocalStream() === null, mm.screenSharing]));
+    mm.dispose();
+    expect(seen).toEqual([]);
+
+    await mm.initLocalStream();
+    await mm.startScreenShare();
+    seen.length = 0;
+    mm.dispose();
+    mm.dispose();
+
+    // listeners see the released state: no stream, no share
+    expect(seen).toEqual([[true, false]]);
   });
 
   it('a device call before any stream leaves the full stream initLocalStream() opens', async () => {

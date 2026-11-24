@@ -1,18 +1,20 @@
 import { icon } from "./icons.js";
-import { SessionElement, reportFailure } from "./session-element.js";
+import { SessionElement, reportFailure, isWaiting } from "./session-element.js";
 
-// the samples' own convention on top of sendData(): a file is a JSON text announcing it, then its bytes
-const announcement = (text) => {
+// a received text as JSON; undefined when it is not JSON
+const parse = (text) => {
   try {
-    const m = JSON.parse(text);
-    return typeof m?.file === "string" ? m : null;
+    return JSON.parse(text);
   } catch {
-    return null;
+    return undefined;
   }
 };
 // only these types are previewed; anything else is kept as plain bytes, never opened as a page
 const IMAGE = /^image\/(png|jpeg|gif|webp|avif)$/;
 const size = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+const clock = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+// sendData() rejects binary over 64 MB; checked here first so no announcement goes out
+const MAX_FILE = 64 * 1048576;
 
 /** A file in the chat: its name, size, a download link and an image preview. Its object URL lives as long as the card. */
 class AmsFile extends HTMLElement {
@@ -36,22 +38,36 @@ class AmsFile extends HTMLElement {
 }
 customElements.define("ams-file", AmsFile);
 
-/** Text and file chat over the session's data channel; usable while the channel is open. */
+/**
+ * Text and file chat over the session's data channel; usable while the channel is open. What the
+ * page puts inside goes into the message area, e.g. an `.empty` state shown until the first message.
+ * With `author` set it is a room's chat: text only, named messages sent through `author.session`.
+ */
 class AmsChat extends SessionElement {
   #open = false;
   #announced = null;
+  #author = null;
+
+  /** `{ session, name }`: the publish session that sends, and the name shown to the others; null for none. */
+  set author(author) {
+    this.#author = author;
+    this.paint();
+  }
 
   connectedCallback() {
+    if (this.querySelector("form")) return;
+    const own = [...this.children];
     this.innerHTML = `
       <div class="msgs" role="log" aria-label="Messages"></div>
       <form class="input">
-        <input aria-label="Message" placeholder="Message everyone on this stream" autocomplete="off">
+        <input aria-label="Message" placeholder="Write a message" autocomplete="off">
         <input type="file" multiple hidden>
-        <button class="mini" type="button" aria-label="Send a file" title="Send a file">${icon("clip")}</button>
+        <button class="mini files" type="button" aria-label="Send a file" title="Send a file">${icon("clip")}</button>
         <button class="mini" aria-label="Send">${icon("send")}</button>
       </form>
-      <p class="hint">Text and files over the stream's data channel, which the server application must allow. Drop a file here to send it.</p>`;
+      <p class="hint">Text<span class="files"> and files</span> over the stream's data channel, which the server application must allow.<span class="files"> Drop a file here to send it.</span></p>`;
     const [msgs, form] = this.children;
+    msgs.append(...own);
     const [, picker, attach] = form.elements;
     form.onsubmit = (e) => {
       e.preventDefault();
@@ -65,13 +81,13 @@ class AmsChat extends SessionElement {
     // a file dropped anywhere on the chat; never let the browser open it instead
     this.ondragover = (e) => {
       e.preventDefault();
-      msgs.classList.toggle("drop", this.#usable());
+      msgs.classList.toggle("drop", this.#usable() && !this.#author);
     };
     this.ondragleave = (e) => this.contains(e.relatedTarget) || msgs.classList.remove("drop");
     this.ondrop = (e) => {
       e.preventDefault();
       msgs.classList.remove("drop");
-      if (this.#usable()) this.#sendFiles(e.dataTransfer.files);
+      if (this.#usable() && !this.#author) this.#sendFiles(e.dataTransfer.files);
     };
     this.paint();
   }
@@ -90,14 +106,19 @@ class AmsChat extends SessionElement {
     ];
   }
 
+  // not while a played stream's source is away
   #usable() {
-    return this.#open && !!this.session && this.session.state !== "ended";
+    return this.#open && !!this.session && this.session.state !== "ended" && !isWaiting(this.session);
   }
 
   paint() {
-    for (const control of this.querySelectorAll("input, button")) control.disabled = !this.#usable();
+    if (!this.querySelector("form")) return;
+    for (const control of this.querySelector("form").elements) control.disabled = !this.#usable();
+    // a file is an announcement, then its bytes: that cannot work with several senders
+    for (const files of this.querySelectorAll(".files")) files.hidden = !!this.#author;
   }
 
+  // the samples' own convention on top of sendData(): a file is a JSON text announcing it, then its bytes.
   // an announcement waits for the bytes right after it; bytes without one are a nameless file
   #receive(data) {
     if (typeof data !== "string") {
@@ -106,7 +127,15 @@ class AmsChat extends SessionElement {
       this.#addFile(new Blob([data], { type: IMAGE.test(type) ? type : "application/octet-stream" }), file);
       return;
     }
-    this.#announced = announcement(data);
+    const m = parse(data);
+    // a room's chat message, named; the server sends my own back to me
+    if (m?.eventType === "MESSAGE_RECEIVED" && typeof m.message === "string") {
+      if (m.senderId !== this.#author?.session.streamId) this.#add(m.message, false, m.name);
+      return;
+    }
+    // the server's and applications' own messages, not chat; a pending announcement still waits for its bytes
+    if (typeof m?.eventType === "string") return;
+    this.#announced = typeof m?.file === "string" ? m : null;
     if (!this.#announced) this.#add(data);
   }
 
@@ -114,8 +143,13 @@ class AmsChat extends SessionElement {
     const input = this.querySelector("input");
     const text = input.value.trim();
     if (!text) return;
+    // in a room: the convention of Ant Media's conference app, so both can talk in one room
+    const author = this.#author;
+    const data = author
+      ? JSON.stringify({ eventType: "MESSAGE_RECEIVED", message: text, name: author.name, senderId: author.session.streamId })
+      : text;
     try {
-      await this.session.sendData(text);
+      await (author?.session ?? this.session).sendData(data);
     } catch (e) {
       reportFailure(this, "sendData()", e);
       return;
@@ -124,37 +158,52 @@ class AmsChat extends SessionElement {
     this.#add(text, true);
   }
 
+  // a file shows at once as "Sending…" and gets its time once all of it is handed to the channel
   async #sendFiles(files) {
     for (const file of files) {
+      if (file.size > MAX_FILE) {
+        reportFailure(this, file.name, { code: "file_too_large" });
+        continue;
+      }
+      const card = this.#addFile(file, file.name, true, "Sending…");
+      card.classList.add("sending");
       try {
         await this.session.sendData(JSON.stringify({ file: file.name, size: file.size, type: file.type }));
         await this.session.sendData(await file.arrayBuffer());
       } catch (e) {
+        card.remove();
         reportFailure(this, "sendData()", e);
         return;
       }
-      this.#addFile(file, file.name, true);
+      card.classList.remove("sending");
+      card.querySelector("time").textContent = clock();
     }
   }
 
-  #addFile(blob, name, mine = false) {
+  #addFile(blob, name, mine = false, time) {
     const card = document.createElement("ams-file");
-    this.#append(card);
     card.show(blob, name, mine);
+    return this.#append(card, time);
   }
 
   // text only: received data is never HTML
-  #add(text, mine = false) {
+  #add(text, mine = false, name = "") {
     const msg = document.createElement("div");
     msg.className = mine ? "msg me" : "msg";
     msg.textContent = text;
+    if (name) msg.prepend(Object.assign(document.createElement("b"), { textContent: name }));
     this.#append(msg);
   }
 
-  #append(msg) {
+  // adds the time and keeps the newest in view, again once a preview has its height
+  #append(msg, time = clock()) {
     const msgs = this.firstElementChild;
+    const end = () => (msgs.scrollTop = msgs.scrollHeight);
+    msg.append(Object.assign(document.createElement("time"), { textContent: time }));
     msgs.append(msg);
-    msgs.scrollTop = msgs.scrollHeight;
+    end();
+    msg.querySelector("img")?.addEventListener("load", end, { once: true });
+    return msg;
   }
 }
 

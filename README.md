@@ -160,7 +160,7 @@ session.on("reconnected", () => console.log("back", session.state));
 
 ## Running the examples
 
-`examples/` holds four pages: `publish.html`, `play.html`, `conference.html` and `data-only.html`.
+`examples/` holds four pages: `publish.html`, `play.html`, `conference.html` and `data-channel.html`.
 
 Run them from the repository:
 

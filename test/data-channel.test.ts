@@ -111,17 +111,27 @@ describe('Data channel chunking and reassembly', () => {
     expect(received.map((e) => e.data.byteLength)).toEqual([7]);
     vi.useRealTimers();
   });
+
+  it('delivers a 0-byte binary message from sender to receiver', async () => {
+    const { client, dcs: [tx] } = withChannel();
+    const { received, dcs: [rx] } = withChannel();
+    tx.send = (d: any) => rx.onmessage!({ data: d } as any);
+    await client.sendData('s1', new ArrayBuffer(0));
+    expect(received).toHaveLength(1);
+    expect(received[0].data).toBeInstanceOf(ArrayBuffer);
+    expect(received[0].data.byteLength).toBe(0);
+  });
 });
 
 describe('data channel receive hardening', () => {
-  it('ignores a header with length 0, negative or above the cap, without throwing', () => {
+  it('ignores a header with a negative length or one above the cap, without throwing', () => {
     const { received, dcs: [dc] } = withChannel();
-    for (const [token, total] of [[1, 0], [2, -5], [3, 2 ** 30]]) {
+    for (const [token, total] of [[2, -5], [3, 2 ** 30]]) {
       expect(() => dc.onmessage!({ data: header(token, total) } as any)).not.toThrow();
       expect(() => dc.onmessage!({ data: chunk(token, [1, 2, 3]) } as any)).not.toThrow();
     }
     // no transfer was opened: each chunk is a plain binary message
-    expect(received.map((e) => e.data.byteLength)).toEqual([7, 7, 7]);
+    expect(received.map((e) => e.data.byteLength)).toEqual([7, 7]);
   });
 
   it('drops a transfer that receives more bytes than its header declared', () => {
@@ -197,5 +207,14 @@ describe('sendData', () => {
     dc.readyState = 'closed';
     dc.emit('close');
     expect(await raceShort(sending)).toBeInstanceOf(SDKError);
+  });
+
+  it('rejects binary larger than the receiver reassembles, sending nothing', async () => {
+    const { client, dcs: [dc] } = withChannel();
+    const send = vi.spyOn(dc, 'send');
+    const err = await client.sendData('s1', new ArrayBuffer(64 * 1024 * 1024 + 1)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SDKError);
+    expect(err).toMatchObject({ code: 'data_too_large' });
+    expect(send).not.toHaveBeenCalled();
   });
 });

@@ -81,7 +81,7 @@ await session.stop();
 
 <script type="module">
   import { WebRTCClient } from "../dist/index.js";
-  import { websocketURL } from "./common.js";
+  import { websocketURL, explain, codeOf, logFailures } from "./common.js";
   import { onStateChange, isWaiting } from "./ui/session-element.js";
   import { fill } from "./ui/ams-devices.js";
   import "./ui/ams-topbar.js";
@@ -109,24 +109,7 @@ await session.stop();
   $("ams-sound-button").video = video;
   $("ams-quality-button").client = client;
 
-  // plain words for the codes a start or an action fails with
-  const problems = {
-    WebSocketNotConnected: "The server could not be reached",
-    timeout: "The server did not start the stream in time",
-    unauthorized_access: "The server refused the token",
-    no_stream_exist: "The stream is not live",
-    streamIdInUse: "This stream is already playing here",
-    session_not_live: "The stream is not playing yet",
-    data_channel_not_available: "The data channel is not open",
-  };
-  const explain = (code, fallback) => `${problems[code] ?? fallback} (${code})`;
-
-  // failures in the event log: the components' actions, and client errors no session hears
-  const logFailure = (code, action) => log.add(code, [action, problems[code]].filter(Boolean).join(": "));
-  // an SDKError's code, else the browser error's name (a DOMException's own code is a number)
-  const codeOf = (error) => (typeof error.code === "string" ? error.code : error.name);
-  document.addEventListener("ams-failure", ({ detail: { action, error } }) => logFailure(codeOf(error), action));
-  client.on("error", ({ error, streamId }) => streamId || logFailure(error));
+  const logFailure = logFailures(client, log);
 
   // ---- the picture's format chip, from the stats samples
   stats.addEventListener("sample", ({ detail: { width, height, frameRate } }) => {

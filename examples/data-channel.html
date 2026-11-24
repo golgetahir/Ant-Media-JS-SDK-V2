@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data channel · Ant Media WebRTC SDK samples</title>
+<meta name="description" content="Chat and send files over a data channel, without any camera or microphone, with the Ant Media WebRTC SDK.">
+<script src="ui/theme.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="ui/ui.css">
+</head>
+<body>
+<ams-topbar></ams-topbar>
+
+<main class="wrap">
+  <nav class="crumb" aria-label="Breadcrumb">
+    <a href="index.html"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Samples</a><span aria-hidden="true">/</span><h1>Data channel</h1>
+  </nav>
+
+  <div class="studio">
+    <div>
+      <section class="talk" aria-label="Conversation">
+        <div class="talk-head">
+          <ams-state-pill></ams-state-pill>
+          <span class="glass mono" id="sid-tag"></span>
+          <div class="actions">
+            <button class="ctl invite" id="join" type="button">Join</button>
+            <button class="go" id="go" type="button">Create channel</button>
+          </div>
+        </div>
+        <div class="talk-body">
+          <ams-chat>
+            <div class="empty">
+              <span class="avatar"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg></span>
+              <p id="empty-text"></p>
+              <button class="btn" id="retry" type="button" hidden>Retry</button>
+            </div>
+            <div class="veil" id="waiting" hidden>
+              <span class="avatar"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+              <p>The channel's creator left. You can write again here as soon as they are back.</p>
+            </div>
+          </ams-chat>
+        </div>
+      </section>
+      <ams-session-rail></ams-session-rail>
+      <ams-event-log></ams-event-log>
+    </div>
+
+    <ams-tabs>
+      <div class="pane" data-tab="Channel">
+        <div class="field"><label for="sid">Channel ID</label>
+          <div class="input"><input id="sid" class="mono" spellcheck="false" autocomplete="off"></div></div>
+        <div class="field"><label for="link">Channel link</label>
+          <div class="input"><input id="link" class="mono" readonly>
+            <button class="mini" id="copy-link" type="button" aria-label="Copy channel link" title="Copy"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button>
+            <a class="mini" id="open-link" target="_blank" rel="noopener" aria-label="Open channel link in a new tab" title="Open in a new tab"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a></div>
+          <p class="hint">Open it in another tab, or send it to someone, to join the channel.</p></div>
+        <p class="hint">Text and files travel over the stream's data channel, so the server application must have data channels enabled.</p>
+      </div>
+      <div class="pane" data-tab="Code">
+        <ams-code>
+import { WebRTCClient } from
+  "@antmedia/webrtc-sdk";
+
+const client =
+  new WebRTCClient({ websocketURL });
+
+// returned at once: listen first.
+// no camera or microphone is opened
+const session = client.publish(
+  channelId, { dataOnly: true });
+// to join: client.play(channelId)
+
+session.on("data_received",
+  ({ data }) => console.log(data));
+session.on("data_channel_opened",
+  async () => {
+    await session.sendData("hello");
+    await session.sendData(
+      await file.arrayBuffer());
+  });
+
+await session.ready(); // channel is up
+await session.stop();
+        </ams-code>
+        <p class="hint">The SDK calls behind this page. Its controls are small components given the same client and session.</p>
+      </div>
+    </ams-tabs>
+  </div>
+</main>
+
+<script type="module">
+  import { WebRTCClient, generateRandomString } from "../dist/index.js";
+  import { websocketURL, streamLink, explain, logFailures } from "./common.js";
+  import { onStateChange, isWaiting } from "./ui/session-element.js";
+  import { copy } from "./ui/copy.js";
+  import "./ui/ams-topbar.js";
+  import "./ui/ams-state-pill.js";
+  import "./ui/ams-session-rail.js";
+  import "./ui/ams-event-log.js";
+  import "./ui/ams-tabs.js";
+  import "./ui/ams-chat.js";
+  import "./ui/ams-code.js";
+
+  const $ = (selector) => document.querySelector(selector);
+  const [log, go, join, sid, link, tag, emptyText, retry, waiting] = [
+    "ams-event-log", "#go", "#join", "#sid", "#link", "#sid-tag", "#empty-text", "#retry", "#waiting",
+  ].map($);
+
+  // no localVideo, no remoteVideo and a data-only publish: this page never opens the camera or microphone
+  const client = new WebRTCClient({ websocketURL });
+  window.adaptor = client;
+  logFailures(client, log);
+
+  // ---- channel id and link
+  function showId() {
+    failure = null;
+    link.value = new URL(streamLink("data-channel.html", sid.value.trim()), location.href).href;
+    $("#open-link").href = link.value;
+    paint();
+  }
+  sid.oninput = showId;
+  $("#copy-link").onclick = (e) => copy(e.currentTarget, link.value);
+
+  // ---- the session: create publishes data only, join plays
+  const views = document.querySelectorAll("ams-state-pill, ams-session-rail, ams-event-log, ams-chat");
+  let session = null;
+  let failure = null;
+  let stopPainting = () => {};
+  const active = () => !!session && session.state !== "ended";
+
+  function paint() {
+    const id = sid.value.trim();
+    const on = active();
+    go.textContent = on ? "Leave" : "Create channel";
+    go.classList.toggle("end", on);
+    go.disabled = !on && !id;
+    join.hidden = on;
+    join.disabled = !id;
+    sid.disabled = on;
+    tag.textContent = id;
+    tag.hidden = !id;
+    waiting.hidden = !isWaiting(session);
+    retry.hidden = on || !failure;
+    if (on) emptyText.textContent = session.state === "starting" ? `Connecting to ${id}…` : "No messages yet. Type below or drop a file here.";
+    else emptyText.textContent = failure ?? "Create a channel, then open its link in another tab";
+  }
+
+  async function start(create) {
+    const id = sid.value.trim();
+    failure = null;
+    retry.onclick = () => start(create);
+    log.add(create ? "publish()" : "play()", id);
+    session = window.session = create ? client.publish(id, { dataOnly: true }) : client.play(id);
+    stopPainting();
+    stopPainting = onStateChange(session, paint);
+    views.forEach((view) => (view.session = session));
+    paint();
+    try {
+      await session.ready();
+    } catch (e) {
+      log.add("ready() rejected", e.code);
+      // Leave during the start cancels it: nothing went wrong
+      if (e.code !== "stream_stopped") failure = explain(e.code, create ? "The channel could not be created" : "The channel could not be joined");
+      paint();
+    }
+  }
+  go.onclick = () => (active() ? session.stop() : start(true));
+  join.onclick = () => start(false);
+
+  // opened with ?id= (the channel link): join at once
+  const linked = new URLSearchParams(location.search).get("id");
+  sid.value = linked ?? `channel_${generateRandomString(6)}`;
+  showId();
+  if (linked) start(false);
+</script>
+</body>
+</html>

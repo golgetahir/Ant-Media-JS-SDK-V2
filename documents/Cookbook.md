@@ -162,20 +162,27 @@ await room.assignVideoTrack("videoTrack0", "bob", true);  // slot videoTrack0 sh
 await room.assignVideoTrack("videoTrack0", "bob", false); // unpin
 ```
 
-To list the participants, read the room's broadcast object. Its `broadcast` field is a JSON string. Ask again when the room's tracks change:
+To list the participants, ask for the room's subtracks. Each entry is a JSON string of a broadcast object, with `streamId`, `name` and `metaData`. Ask again when someone comes or goes:
 
 ```ts
-async function participants(): Promise<string[]> {
-  const { broadcast } = await client.getBroadcastObject("room1");
-  return broadcast ? (JSON.parse(broadcast).subTrackStreamIds ?? []) : [];
+async function participants() {
+  const { subtrackList } = await client.getSubtracks("room1", "", 0, 100);
+  return subtrackList.map(entry => JSON.parse(entry));
 }
 
 room.on("track_list_updated", () => {
-  void participants().then(ids => console.log("in the room:", ids));
+  void participants().then(list => console.log("in the room:", list.map(p => p.name)));
+  void room.requestVideoTrackAssignments();
 });
 ```
 
 `video_track_assignments` and `track_list_updated` come over the data channel, so the room's data channel must be enabled on the server.
+
+The page shares these conventions with Ant Media's conference app, so both can meet in one room:
+
+- each participant's `metaData` is `JSON.stringify({ isMicMuted, isCameraOn })`, given to `publish()` and updated with `me.updateStreamMetaData()`;
+- a microphone or camera change is also sent over the publish session: `JSON.stringify({ streamId: myId, eventType })` with `MIC_MUTED`, `MIC_UNMUTED`, `CAM_TURNED_OFF` or `CAM_TURNED_ON`;
+- a chat message is `JSON.stringify({ eventType: "MESSAGE_RECEIVED", message, name, senderId: myId })`, sent over the publish session. The others' notices and messages arrive as `data_received` on the room session; the server sends your own messages back to you there too, so skip those whose `senderId` is yours.
 
 To stop receiving one participant, disable their track. Enable it again to resume:
 
@@ -208,7 +215,7 @@ await session.sendData("joined");
 
 The channel can open before or after the stream is reported live, and `sendData` needs both, so wait for both.
 
-Others join by playing the same id. `examples/data-only.html` tries to play the id first and publishes it data-only when that fails.
+Others join by playing the same id. `examples/data-channel.html` creates the channel with a data-only publish, and its link opens a second tab that joins it by playing.
 
 ## Send and receive data
 
@@ -234,7 +241,7 @@ Text arrives as a string, binary as an `ArrayBuffer`. Pass binary data as an `Ar
 
 Binary messages are sent in chunks of 16000 bytes and reassembled on the other side, in the same format as v1, so v1 and v2 pages can exchange them. Incoming binary messages larger than 64 MiB are not reassembled. `sendData` waits when the channel's buffer is over 1 MiB, so await it before sending the next large message.
 
-`sendData` rejects with `data_channel_not_available` when the channel is not open, `session_not_live` before the stream is live, and `session_ended` after it ended.
+`sendData` rejects with `data_channel_not_available` when the channel is not open, `data_too_large` for binary data over 64 MiB, `session_not_live` before the stream is live, and `session_ended` after it ended.
 
 The server also sends its own JSON messages over the data channel. They arrive in `data_received` like any text. Two of them also get their own events: `video_track_assignments` and `track_list_updated`.
 
@@ -282,7 +289,7 @@ await client.media.stopScreenWithCameraOverlay();
 
 `startScreenShare()` asks for the screen with audio. If the user shares audio, it is mixed with the microphone; `client.media.enableSecondStreamInMixedAudio(false)` silences the microphone in that mix.
 
-The overlay draws the camera into the top-right corner of the screen, 15% of its width, at about 15 frames per second.
+The overlay draws the camera into the top-right corner of the screen, 15% of its width, at about 15 frames per second. During a share with the camera overlay, `selectVideoInput()` switches the overlay's camera at once, even while the camera is off; during a plain screen share the selection applies when the share ends.
 
 When the user ends either share from the browser's own control, the camera comes back on its own and the client emits `screen_share_stopped`:
 

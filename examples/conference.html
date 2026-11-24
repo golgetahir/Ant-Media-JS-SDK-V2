@@ -1,704 +1,293 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ant Media WebRTC Conference (SDK v2)</title>
-    <script src="vendor/adapter-latest.js"></script>
-	<script src="vendor/jquery-3.7.1.min.js"></script>
-	<script src="vendor/notify.min.js" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="vendor/bootstrap.min.css">
-    <link rel="stylesheet" href="vendor/bootstrap4-compat.css">
-    <link rel="stylesheet" href="vendor/common.css">
-    <style>
-      video {
-        width: 100%;
-        max-width: 320px;
-        height: 100%;
-        max-height: 240px;
-        background: #000;
-      }
-
-      body {
-        padding-top: 20px;
-        padding-bottom: 20px;
-      }
-
-      .options {
-        display: none;
-      }
-
-      .message-area {
-        height: 300px;
-        overflow-y: auto;
-        border-style: groove;
-        border-width: thin;
-        background-color: white;
-      }
-
-      #players {
-        position: relative;
-      }
-
-      .player-tile {
-        position: relative;
-        margin-bottom: 12px;
-      }
-
-      .player-overlay {
-        font-size: 10px;
-        position: absolute;
-        top: 5px;
-        left: 50%;
-        transform: translateX(-50%);
-        color: white;
-        background-color: rgba(0, 0, 0, 0.5);
-        padding: 5px;
-      }
-    </style>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conference · Ant Media WebRTC SDK samples</title>
+<meta name="description" content="Meet in a room with many participants: video tiles, pinning, paging and chat with the Ant Media WebRTC SDK.">
+<script src="ui/theme.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="ui/ui.css">
 </head>
-  <body>
-    <div class="container">
-      <div class="header clearfix">
-        <div class="row">
-          <h3 class="col text-muted">WebRTC Multitrack Conference (SDK v2)</h3>
-          <nav class="col align-self-center">
-            <ul class="nav float-right">
-              <li><a href="http://antmedia.io">Contact</a></li>
-            </ul>
-          </nav>
+<body>
+<ams-topbar></ams-topbar>
+
+<main class="wrap">
+  <nav class="crumb" aria-label="Breadcrumb">
+    <a href="index.html"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Samples</a><span aria-hidden="true">/</span><h1>Conference</h1>
+  </nav>
+
+  <div class="studio">
+    <div>
+      <ams-tiles>
+        <div class="overlay tl"><ams-state-pill></ams-state-pill></div>
+        <div class="overlay bl"><span class="glass mono" id="rid-tag"></span></div>
+        <div class="dock">
+          <ams-mic-button></ams-mic-button>
+          <ams-camera-button></ams-camera-button>
+          <ams-screen-button></ams-screen-button>
+          <span class="sep"></span>
+          <button class="go" id="go" type="button">Join</button>
         </div>
-      </div>
-
-      <div class="jumbotron">
-        <div class="alert alert-primary text-center enterprise-feature" role="alert" style="margin-top:-2em">
-          WebRTC Conference is an enterprise edition feature.<br />
-          <a href="https://antmedia.io">Try Enterprise Edition for free at antmedia.io</a>
-        </div>
-        <div class="alert alert-primary text-center" role="alert" style="margin-top:-2em">
-          Something ready to use?<br />
-          <a href="https://antmedia.io/marketplace/circle-video-conferencing-tool/">Circle: Online Video Conferencing</a>
-        </div>
-        <div id="players" class="row">
-          <div class="col-sm-3 player-tile" id="player-local">
-            <video id="localVideo" autoplay muted playsinline></video>
-            <div style="margin-top:10px;display:none" class="col-sm-8 col-sm-offset-2">
-              Microphone Gain:
-              <input type="range" id="volume_change_input" min="0" max="1" value="1" step="0.01" />
-            </div>
-          </div>
-        </div>
-
-        <div class="row" style="padding: 15px;">
-          <div class="col-sm-8 offset-sm-2">
-            <div style="padding:5px" class="form-check form-check-inline col-sm-10">
-              <input type="text" class="form-control" value="room1" id="roomName" placeholder="Type room name" />
-            </div>
-            <div style="padding:5px">
-              <button class="btn btn-primary" id="join_publish_button">Join Room</button>
-              <button class="btn btn-primary" disabled id="stop_publish_button">Leave Room</button>
-            </div>
-
-            <div class="badge badge-success" id="broadcastingInfo" style="font-size: 14px; display: none">
-              Publishing
-            </div>
-
-            <div class="col-sm-12 text-right">
-              <button type="button" id="options" class="btn btn-outline-primary btn-sm">Options</button>
-            </div>
-            <div class="form-group col-sm-12 text-left options">
-              <div style="padding:10px">
-                <button id="turn_off_camera_button" class="btn btn-outline-primary">Turn off Camera</button>
-                <button id="turn_on_camera_button" disabled class="btn btn-outline-primary">Turn on Camera</button>
-                <button id="mute_mic_button" class="btn btn-outline-primary">Mute Local Mic</button>
-                <button id="unmute_mic_button" disabled class="btn btn-outline-primary">Unmute Local Mic</button>
-              </div>
-
-              <label>Video Source</label>
-              <br />
-              <div class="form-check form-check-inline">
-                <input class="form-check-input video-source" disabled name="videoSource" type="radio" value="camera" id="camera_checkbox" checked />
-                <label class="form-check-label" for="camera_checkbox" style="font-weight:normal">Camera</label>
-              </div>
-              <div class="form-check form-check-inline">
-                <input class="form-check-input video-source" disabled name="videoSource" type="radio" value="screen" id="screen_share_checkbox" />
-                <label class="form-check-label" for="screen_share_checkbox" style="font-weight:normal">Screen</label>
-              </div>
-              <div class="form-check form-check-inline">
-                <input class="form-check-input video-source" disabled name="videoSource" type="radio" value="screen+camera" id="screen_share_with_camera_checkbox" />
-                <label class="form-check-label" for="screen_share_with_camera_checkbox" style="font-weight:normal">Screen with Camera</label>
-                <div class="form-check form-check-inline"></div>
-                <a id="browser_screen_share_doesnt_support" href="https://caniuse.com/#search=getDisplayMedia">Your browser doesn't support screen share. You can see supported browsers in this link</a>
-              </div>
-              <br />
-              <label>Data Channel Messages</label>
-              <div id="all-messages" class="message-area"></div>
-              <div class="form-row">
-                <div class="form-group col-sm-10">
-                  <input type="text" class="form-control" id="dataTextbox" placeholder="Write your message" />
-                </div>
-                <div class="form-group col-sm-2">
-                  <button type="button" id="send" class="btn btn-outline-primary btn-block">Send</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <footer class="footer">
-        <p>
-          <a href="http://antmedia.io">Ant Media Server Enterprise Edition</a>
-        </p>
-      </footer>
+      </ams-tiles>
+      <ams-session-rail></ams-session-rail>
+      <ams-event-log></ams-event-log>
     </div>
 
-    <script type="module">
-      import { WebRTCClient, generateRandomString } from '../dist/index.js';
-      import { websocketURL, sourceStopped } from './common.js';
+    <ams-tabs>
+      <div class="pane" data-tab="Room">
+        <div class="field"><label for="rid">Room name</label>
+          <div class="input"><input id="rid" class="mono" spellcheck="false" autocomplete="off"></div></div>
+        <div class="field"><label for="name">Your name</label>
+          <div class="input"><input id="name" spellcheck="false" autocomplete="off"></div></div>
+        <div class="field"><label for="invite">Invite link</label>
+          <div class="input"><input id="invite" class="mono" readonly>
+            <button class="mini" id="copy-invite" type="button" aria-label="Copy invite link" title="Copy"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button>
+            <a class="mini" id="open-invite" target="_blank" rel="noopener" aria-label="Open invite link in a new tab" title="Open in a new tab"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a></div>
+          <p class="hint">Open it in another tab, or send it to someone, to meet in this room.</p></div>
+        <div class="field"><label for="per-page">Videos per page</label>
+          <div class="input"><select id="per-page" class="mono">
+            <option>2</option><option>4</option><option selected>6</option><option>9</option>
+          </select><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></div>
+          <p class="hint">The server sends only this many videos. The arrows on the room move through everyone.</p></div>
+        <p class="hint">Who is on which video, the microphone and camera notices and the chat travel over data channels, so the server application must have data channels enabled.</p>
+      </div>
+      <div class="pane" data-tab="People"><ams-people></ams-people></div>
+      <div class="pane" data-tab="Chat">
+        <ams-chat>
+          <div class="empty">
+            <span class="avatar"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg></span>
+            <p>Messages to everyone in the room appear here.</p>
+          </div>
+        </ams-chat>
+      </div>
+      <div class="pane" data-tab="Devices"><ams-devices></ams-devices></div>
+      <div class="pane" data-tab="Code">
+        <ams-code>
+import { WebRTCClient } from
+  "@antmedia/webrtc-sdk";
 
-      const Logger = console;
+const client = new WebRTCClient({
+  websocketURL, localVideo,
+});
 
-      const volumeSlider = document.getElementById('volume_change_input');
-      const joinBtn = document.getElementById('join_publish_button');
-      const leaveBtn = document.getElementById('stop_publish_button');
-      const turnOffCamBtn = document.getElementById('turn_off_camera_button');
-      const turnOnCamBtn = document.getElementById('turn_on_camera_button');
-      const muteBtn = document.getElementById('mute_mic_button');
-      const unmuteBtn = document.getElementById('unmute_mic_button');
-      const optionsBtn = document.getElementById('options');
-      const sendBtn = document.getElementById('send');
-      const dataTextbox = document.getElementById('dataTextbox');
-      const messagesEl = document.getElementById('all-messages');
-      const playersEl = document.getElementById('players');
-      const broadcastingInfo = document.getElementById('broadcastingInfo');
-      const roomNameEl = document.getElementById('roomName');
-      const cameraRadio = document.getElementById('camera_checkbox');
-      const optionsPanel = document.querySelector('.options');
+// publish into the room first: it
+// exists once someone publishes
+const me = client.publish(myId,
+  { roomId, streamName: "Alice" });
+await me.ready();
 
-      const params = new URLSearchParams(location.search);
-      const token = params.get('token') || undefined;
-      let publishStreamId = params.get('streamId') || '';
-      let playOnly = params.get('playOnly') === 'true';
-      const dcOnly = params.get('dcOnly') === 'true';
-      const role = params.get('role') || undefined;
-      const roomIdFromUrl = params.get('roomId');
-      const streamNameFromUrl = params.get('streamName');
-      const subscriberId = params.get('subscriberId') || undefined;
-      const subscriberName = params.get('subscriberName') || undefined;
-      const subscriberCode = params.get('subscriberCode') || undefined;
+// then play the room
+const room = client.play(roomId,
+  { roomId, userPublishId: myId });
+// tracks arrive per slot:
+// videoTrack0…, audioTrack0…
+room.on("newTrackAvailable",
+  ({ track, trackId }) => {
+    const slot = trackId.substring(7);
+    media(slot).srcObject =
+      new MediaStream([track]);
+  });
+// whose stream each slot shows
+room.on("video_track_assignments",
+  ({ payload }) => show(payload));
+await room.ready();
 
-      if (roomIdFromUrl) {
-        roomNameEl.value = roomIdFromUrl;
+// leave
+await room.stop();
+await me.stop();
+        </ams-code>
+        <p class="hint">The SDK calls behind this page. Its controls are small components given the same client and sessions.</p>
+      </div>
+    </ams-tabs>
+  </div>
+</main>
+
+<script type="module">
+  import { WebRTCClient, generateRandomString } from "../dist/index.js";
+  import { websocketURL, streamLink, explain, codeOf, logFailures, cameraPreview } from "./common.js";
+  import { copy } from "./ui/copy.js";
+  import "./ui/ams-topbar.js";
+  import "./ui/ams-tiles.js";
+  import "./ui/ams-state-pill.js";
+  import "./ui/ams-toggle-buttons.js";
+  import "./ui/ams-screen-button.js";
+  import "./ui/ams-session-rail.js";
+  import "./ui/ams-event-log.js";
+  import "./ui/ams-tabs.js";
+  import "./ui/ams-people.js";
+  import "./ui/ams-chat.js";
+  import "./ui/ams-devices.js";
+  import "./ui/ams-code.js";
+
+  const $ = (selector) => document.querySelector(selector);
+  const [tiles, people, chat, log, go, rid, nick, invite, perPage, tag] = [
+    "ams-tiles", "ams-people", "ams-chat", "ams-event-log", "#go", "#rid", "#name", "#invite", "#per-page", "#rid-tag",
+  ].map($);
+
+  // your own tile is the camera preview
+  const client = new WebRTCClient({ websocketURL, localVideo: tiles.own.video });
+  window.adaptor = client;
+  for (const control of document.querySelectorAll("ams-mic-button, ams-camera-button, ams-screen-button, ams-devices")) {
+    control.client = client;
+  }
+  const logFailure = logFailures(client, log);
+  const { preview, showPicture } = cameraPreview(client, tiles.own);
+
+  // one publish id per page load
+  const myId = generateRandomString(12);
+  tiles.myId = myId;
+
+  // ---- room name, invite link, videos per page
+  function showRoom() {
+    const roomId = rid.value.trim();
+    tag.textContent = roomId;
+    tag.hidden = !roomId;
+    invite.value = new URL(streamLink("conference.html", roomId), location.href).href;
+    $("#open-invite").href = invite.value;
+    paint();
+  }
+  rid.oninput = showRoom;
+  nick.oninput = () => paint();
+  $("#copy-invite").onclick = (e) => copy(e.currentTarget, invite.value);
+  perPage.onchange = () => (tiles.perPage = Number(perPage.value));
+
+  // ---- who is here: id → { name, micMuted, cameraOff }, without you
+  const participants = new Map();
+  const json = (text) => {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return null;
+    }
+  };
+  function show() {
+    tiles.people = participants;
+    people.people = participants;
+  }
+
+  // asked again whenever someone comes or goes
+  async function refresh() {
+    const playing = room;
+    playing.requestVideoTrackAssignments().catch((e) => logFailure(codeOf(e), "requestVideoTrackAssignments()"));
+    try {
+      // ponytail: the first 100 participants only; page with getSubtracks' offset for larger rooms
+      const { subtrackList } = await client.getSubtracks(playing.streamId, "", 0, 100);
+      if (playing !== room) return;
+      participants.clear();
+      for (const { streamId, name, metaData } of subtrackList.map((entry) => JSON.parse(entry))) {
+        const state = json(metaData) ?? {};
+        if (streamId !== myId) participants.set(streamId, { name: name || streamId, micMuted: !!state.isMicMuted, cameraOff: state.isCameraOn === false });
       }
+      show();
+    } catch (e) {
+      logFailure(codeOf(e), "getSubtracks()");
+    }
+  }
 
-      appendMessage(`websocketURL: ${websocketURL}`);
+  // ---- microphone and camera notices, as Ant Media's conference app sends them
+  const notices = {
+    MIC_MUTED: { micMuted: true },
+    MIC_UNMUTED: { micMuted: false },
+    CAM_TURNED_OFF: { cameraOff: true },
+    CAM_TURNED_ON: { cameraOff: false },
+  };
+  function hear({ data }) {
+    const { eventType, streamId } = json(data) ?? {};
+    const person = participants.get(streamId);
+    if (!person || !Object.hasOwn(notices, eventType)) return;
+    Object.assign(person, notices[eventType]);
+    show();
+  }
 
-      const client = new WebRTCClient({
-        websocketURL,
-        localVideo: document.getElementById('localVideo'),
-        autoReconnect: true,
-        mediaConstraints: { video: !dcOnly ? { width: { min: 176, max: 360 } } : !dcOnly, audio: !dcOnly },
-        debug: true
-      });
+  // yours: a notice for who is here, the metadata for who joins later; again on each start, a reconnect's too
+  const mine = () => ({ micMuted: client.media.micMuted, cameraOff: client.media.cameraOff });
+  const metaData = ({ micMuted, cameraOff }) => JSON.stringify({ isMicMuted: micMuted, isCameraOn: !cameraOff });
+  let heard; // what the others last heard, set on join
+  function announce(started = false) {
+    if (!me || (!started && me.state !== "live")) return;
+    const now = mine();
+    const changes = [
+      now.micMuted !== heard.micMuted && (now.micMuted ? "MIC_MUTED" : "MIC_UNMUTED"),
+      now.cameraOff !== heard.cameraOff && (now.cameraOff ? "CAM_TURNED_OFF" : "CAM_TURNED_ON"),
+    ].filter(Boolean);
+    if (!started && !changes.length) return;
+    heard = now;
+    for (const eventType of changes) {
+      me.sendData(JSON.stringify({ streamId: myId, eventType })).catch((e) => logFailure(codeOf(e), eventType));
+    }
+    me.updateStreamMetaData(metaData(now));
+  }
+  for (const event of ["local_track_paused", "local_track_resumed", "local_tracks_changed"]) client.on(event, () => announce());
 
-      window.conferenceClient = client;
-      window.adaptor = client;
-      let publishSession = null;
-      let playSession = null;
+  // ---- the room: publish into it, then play it
+  const views = document.querySelectorAll("ams-state-pill, ams-session-rail, ams-event-log");
+  let me = null;
+  let room = null;
+  const offs = [];
 
-      // camera preview before joining, as when the client opened it
-      if (!playOnly && !dcOnly) {
-        client.media.initLocalStream().catch(err => appendMessage(`Camera failed: ${err?.name || err?.message || err}`));
-      }
+  function paint() {
+    go.textContent = me ? "Leave" : "Join";
+    go.classList.toggle("end", !!me);
+    go.disabled = !me && !(rid.value.trim() && nick.value.trim());
+    rid.disabled = nick.disabled = !!me;
+  }
 
-      const participants = new Map();
-      let isCameraOff = false;
-      let isMicMuted = false;
-      let isDataChannelOpen = false;
-      let isPlayingRoom = false;
+  // a session the server ended, not one whose source stopped: leave
+  const whenEnded = (session, finished) => session.on(finished, () => session.state === "ended" && leave());
 
-      function log(msg, ...args) {
-        Logger.debug('[conference]', msg, ...args);
-      }
+  async function join() {
+    const roomId = rid.value.trim();
+    const name = nick.value.trim();
+    heard = mine();
+    log.add("publish()", roomId);
+    me = window.publishSession = client.publish(myId, { roomId, streamName: name, metaData: metaData(heard) });
+    offs.push(me.on("publish_started", () => announce(true)), whenEnded(me, "publish_finished"));
+    views.forEach((view) => (view.session = me));
+    chat.author = { session: me, name };
+    if (!client.media.getLocalStream()) tiles.own.setPlaceholder("Opening your camera…");
+    paint();
+    try {
+      await me.ready();
+      showPicture(); // the publish opened the camera itself if the preview had not
+      log.add("play()", roomId);
+      room = window.playSession = client.play(roomId, { roomId, userPublishId: myId });
+      offs.push(room.on("play_started", refresh), room.on("track_list_updated", refresh), room.on("data_received", hear), whenEnded(room, "play_finished"));
+      for (const view of [tiles, people, chat]) view.session = room;
+      await room.ready();
+    } catch (e) {
+      log.add("ready() rejected", e.code);
+      // Leave during the start cancels it: nothing went wrong
+      if (e.code !== "stream_stopped") leave(explain(e.code, "The room could not be joined"), { label: "Retry", run: join });
+    }
+  }
 
-      function setJoinEnabled(flag) {
-        joinBtn.disabled = !flag;
-      }
+  // stop both, then release the camera and microphone; your tile says why
+  async function leave(text = "You left the room", action = { label: "Open camera", run: preview }) {
+    if (!me) return;
+    const sessions = [me, room].filter(Boolean);
+    me = room = null;
+    offs.splice(0).forEach((off) => off());
+    for (const view of [tiles, people, chat]) view.session = null;
+    chat.author = null;
+    participants.clear();
+    show();
+    paint();
+    await Promise.all(sessions.map((session) => session.stop()));
+    if (me) return; // joined again meanwhile: that publish has the camera
+    client.media.dispose();
+    tiles.own.setPlaceholder(text, action);
+  }
+  go.onclick = () => (me ? leave() : join());
 
-      function setLeaveEnabled(flag) {
-        leaveBtn.disabled = !flag;
-      }
-
-      function toggleOptions() {
-        if (!optionsPanel) return;
-        const isVisible = optionsPanel.style.display === 'block';
-        optionsPanel.style.display = isVisible ? 'none' : 'block';
-      }
-
-      function appendMessage(text) {
-        messagesEl.innerHTML += `${text}<br />`;
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-      }
-
-      function handleCameraButtons() {
-        turnOffCamBtn.disabled = isCameraOff;
-        turnOnCamBtn.disabled = !isCameraOff;
-      }
-
-      function handleMicButtons() {
-        muteBtn.disabled = isMicMuted;
-        unmuteBtn.disabled = !isMicMuted;
-      }
-
-      function getUserMetadata() {
-        return {
-          isMicMuted,
-          isCameraOff
-        };
-      }
-
-      function updateMetadata() {
-        if (publishSession && publishSession.state !== 'ended') {
-          publishSession.updateStreamMetaData(JSON.stringify(getUserMetadata()));
-        }
-      }
-
-      function createRemoteTile(streamId, kind) {
-        const existing = document.getElementById(`player-${streamId}`);
-        if (existing) return existing;
-        const col = document.createElement('div');
-        col.className = 'col-sm-3 player-tile';
-        col.id = `player-${streamId}`;
-        if (kind === 'audio') {
-          col.style.display = 'none';
-        }
-        col.innerHTML = `
-          <video id="remoteVideo-${streamId}" autoplay playsinline controls></video>
-          <div class="player-overlay" id="overlay-${streamId}">${streamId}</div>
-        `;
-        playersEl.appendChild(col);
-        return col;
-      }
-
-      function removeRemoteTile(streamId) {
-        const col = document.getElementById(`player-${streamId}`);
-        if (col) {
-          const video = col.querySelector('video');
-          if (video) {
-            const media = video.srcObject;
-            if (media) {
-              media.getTracks().forEach(t => t.stop());
-            }
-            video.srcObject = null;
-          }
-          playersEl.removeChild(col);
-        }
-      }
-
-      function removeAllRemoteTiles() {
-        [...playersEl.querySelectorAll('.player-tile')].forEach((tile, index) => {
-          if (tile.id === 'player-local') return;
-          playersEl.removeChild(tile);
-        });
-      }
-
-      function updateOverlay(streamId, text) {
-        const overlay = document.getElementById(`overlay-${streamId}`);
-        if (overlay) {
-          overlay.textContent = text;
-        }
-      }
-
-      async function handleJoin() {
-        const roomId = roomNameEl.value.trim();
-        if (!roomId) {
-          appendMessage('Room name is required.');
-          return;
-        }
-
-        if (!publishStreamId) {
-          publishStreamId = generateRandomString(12);
-        }
-
-        const metadata = JSON.stringify(getUserMetadata());
-
-        try {
-          if (!playOnly) {
-            publishSession = client.publish(publishStreamId, {
-              roomId,
-              token,
-              subscriberId,
-              subscriberCode,
-              streamName: streamNameFromUrl || publishStreamId,
-              metaData: metadata,
-              role,
-              dataOnly: dcOnly
-            });
-            window.publishSession = publishSession;
-            listenToPublish(publishSession);
-            await publishSession.ready();
-          }
-
-          playSession = client.play(roomId, {
-            roomId,
-            token,
-            subscriberId,
-            subscriberCode,
-            subscriberName,
-            role,
-            disableTracksByDefault: false,
-            userPublishId: publishStreamId
-          });
-          window.playSession = playSession;
-          listenToPlay(playSession);
-          await playSession.ready();
-
-          setJoinEnabled(false);
-          setLeaveEnabled(true);
-          toggleVideoSourceControls(true);
-        } catch (err) {
-          appendMessage(`Join failed: ${err?.message || err?.error || err}`);
-          log('Join failed', err);
-        }
-      }
-
-      function toggleVideoSourceControls(enabled) {
-        for (const radio of document.querySelectorAll('input[name="videoSource"]')) {
-          radio.disabled = !enabled;
-        }
-      }
-
-      function handleLeave() {
-        const roomId = roomNameEl.value.trim();
-        removeAllRemoteTiles();
-        participants.clear();
-        setJoinEnabled(true);
-        setLeaveEnabled(false);
-        toggleVideoSourceControls(false);
-        broadcastingInfo.style.display = 'none';
-        if (publishSession) {
-          publishSession.stop();
-        }
-        if (playSession) {
-          playSession.stop();
-        }
-        isPlayingRoom = false;
-      }
-
-      async function handleSendData() {
-        const message = dataTextbox.value.trim();
-        if (!message) return;
-        const payload = { streamId: publishStreamId, eventType: 'CHAT_MESSAGE', message };
-        try {
-          if (isDataChannelOpen && publishSession) {
-            await publishSession.sendData(JSON.stringify(payload));
-          } else if (isDataChannelOpen && playSession) {
-            await playSession.sendData(JSON.stringify(payload));
-          } else {
-            appendMessage('Data channel is not open.');
-            return;
-          }
-          appendMessage(`Sent: ${message}`);
-          dataTextbox.value = '';
-        } catch (err) {
-          appendMessage(`Send failed: ${err?.message || err?.error || err}`);
-        }
-      }
-
-      async function switchVideoMode(mode) {
-        try {
-          if (mode === 'screen') {
-            await client.media.startScreenShare();
-          } else if (mode === 'screen+camera') {
-            await client.media.startScreenWithCameraOverlay();
-          } else {
-            await client.media.stopScreenShare();
-            await client.media.turnOnLocalCamera();
-          }
-        } catch (err) {
-          appendMessage(`Switch video failed: ${err?.message || err?.error || err}`);
-          cameraRadio.checked = true;
-        }
-      }
-
-      async function turnOffCamera() {
-        try {
-          client.media.turnOffLocalCamera();
-          isCameraOff = true;
-          handleCameraButtons();
-          sendNotificationEvent('CAM_TURNED_OFF');
-          updateMetadata();
-        } catch (err) {
-          appendMessage('Turn off camera failed.');
-        }
-      }
-
-      async function turnOnCamera() {
-        try {
-          await client.media.turnOnLocalCamera();
-          isCameraOff = false;
-          handleCameraButtons();
-          sendNotificationEvent('CAM_TURNED_ON');
-          updateMetadata();
-        } catch (err) {
-          appendMessage('Turn on camera failed.');
-        }
-      }
-
-      function muteMic() {
-        client.media.muteLocalMic();
-        isMicMuted = true;
-        handleMicButtons();
-        sendNotificationEvent('MIC_MUTED');
-        updateMetadata();
-      }
-
-      function unmuteMic() {
-        client.media.unmuteLocalMic();
-        isMicMuted = false;
-        handleMicButtons();
-        sendNotificationEvent('MIC_UNMUTED');
-        updateMetadata();
-      }
-
-      function sendNotificationEvent(eventType) {
-        if (!isDataChannelOpen) {
-          log('Data channel closed; cannot send notification');
-          return;
-        }
-        const payload = { streamId: publishStreamId, eventType };
-        try {
-          if (publishSession) {
-            publishSession.sendData(JSON.stringify(payload));
-          }
-        } catch (err) {
-          log('Notification send failed', err);
-        }
-      }
-
-      // the answer also arrives as broadcast_object, handled below
-      function requestBroadcastObject(streamId) {
-        client.getBroadcastObject(streamId).catch(err => log('getBroadcastObject failed', streamId, err));
-      }
-
-      function handleBroadcastObject(obj) {
-        const broadcastObject = typeof obj.broadcast === 'string' ? JSON.parse(obj.broadcast) : obj.broadcast;
-        if (!broadcastObject) return;
-        if (obj.streamId === roomNameEl.value.trim()) {
-          handleRoomBroadcastObject(broadcastObject);
-        } else {
-          handleParticipantBroadcastObject(broadcastObject);
-        }
-      }
-
-      function handleRoomBroadcastObject(broadcastObject) {
-        const list = broadcastObject.subTrackStreamIds || [];
-        // Remove missing
-        for (const [streamId, info] of participants.entries()) {
-          if (!info.isFake && !list.includes(streamId)) {
-            log('Removing participant', streamId);
-            participants.delete(streamId);
-            removeRemoteTile(streamId);
-          }
-        }
-        // Fetch missing
-        list.forEach(id => {
-          if (!participants.has(id)) {
-            requestBroadcastObject(id);
-          }
-        });
-      }
-
-      function handleParticipantBroadcastObject(broadcastObject) {
-        const streamId = broadcastObject.streamId;
-        if (!streamId) return;
-        if (broadcastObject.metaData) {
-          try {
-            const meta = JSON.parse(broadcastObject.metaData);
-            broadcastObject.isCameraOff = meta.isCameraOff;
-            broadcastObject.isMicMuted = meta.isMicMuted;
-          } catch (e) {
-            log('Metadata parse failed', e);
-          }
-        }
-        participants.set(streamId, broadcastObject);
-        updateOverlay(streamId, `${streamId}${broadcastObject.isMicMuted ? ' (muted)' : ''}`);
-      }
-
-      function handleNotificationEvent(data) {
-        const payload = typeof data.data === 'string' ? JSON.parse(data.data) : data.data;
-        if (!payload || typeof payload !== 'object') {
-          log('Unknown data payload', payload);
-          return;
-        }
-        const { eventType, message, streamId } = payload;
-        switch (eventType) {
-          case 'CHAT_MESSAGE':
-            appendMessage(`Received: ${message}`);
-            break;
-          case 'CAM_TURNED_OFF':
-          case 'CAM_TURNED_ON':
-          case 'MIC_MUTED':
-          case 'MIC_UNMUTED':
-            requestBroadcastObject(roomNameEl.value.trim());
-            break;
-          default:
-            log('Notification event', eventType, payload);
-            break;
-        }
-      }
-
-      function startBroadcastingAnimation() {
-        broadcastingInfo.style.display = 'inline-block';
-        broadcastingInfo.style.opacity = '1';
-        broadcastingInfo.animate(
-          [{ opacity: 1 }, { opacity: 0 }],
-          { duration: 1600, iterations: Infinity }
-        );
-      }
-
-      volumeSlider.addEventListener('input', () => {
-        client.media.setVolumeLevel(parseFloat(volumeSlider.value));
-      });
-
-      joinBtn.addEventListener('click', handleJoin);
-      leaveBtn.addEventListener('click', handleLeave);
-      optionsBtn.addEventListener('click', toggleOptions);
-      sendBtn.addEventListener('click', handleSendData);
-      dataTextbox.addEventListener('keyup', e => {
-        if (e.key === 'Enter') handleSendData();
-      });
-      turnOffCamBtn.addEventListener('click', () => { void turnOffCamera(); });
-      turnOnCamBtn.addEventListener('click', () => { void turnOnCamera(); });
-      muteBtn.addEventListener('click', muteMic);
-      unmuteBtn.addEventListener('click', unmuteMic);
-
-      document.querySelectorAll('input[name="videoSource"]').forEach(radio => {
-        radio.addEventListener('change', e => {
-          if (e.target.checked) {
-            void switchVideoMode(e.target.value);
-          }
-        });
-      });
-
-      client.on('initialized', () => {
-        log('initialized');
-        setJoinEnabled(true);
-        setLeaveEnabled(false);
-        if (playOnly) {
-          isCameraOff = true;
-          handleCameraButtons();
-        }
-      });
-
-      // events of one stream go on its session: each join gets fresh listeners
-      function listenToStream(s) {
-        s.on('data_channel_opened', () => {
-          log('data channel opened');
-          isDataChannelOpen = true;
-        });
-
-        s.on('data_channel_closed', () => {
-          log('data channel closed');
-          isDataChannelOpen = false;
-        });
-
-        s.on('data_received', handleNotificationEvent);
-
-        s.on('ice_connection_state_changed', ({ state, streamId }) => {
-          log('ICE state', state, streamId);
-          if (state === 'failed' || state === 'closed') {
-            requestBroadcastObject(roomNameEl.value.trim());
-          }
-        });
-      }
-
-      function listenToPublish(s) {
-        listenToStream(s);
-        s.on('publish_started', ({ streamId }) => {
-          log('publish started', streamId);
-          setJoinEnabled(false);
-          setLeaveEnabled(true);
-          startBroadcastingAnimation();
-        });
-
-        s.on('reconnection_attempt_for_publisher', () => {
-          log('Reconnection attempt (publisher)');
-        });
-      }
-
-      function listenToPlay(s) {
-        listenToStream(s);
-        s.on('play_started', ({ streamId }) => {
-          log('play started', streamId);
-          isPlayingRoom = true;
-          requestBroadcastObject(streamId);
-        });
-
-        s.on('play_finished', ({ streamId }) => {
-          if (sourceStopped(s, log)) return;
-          log('play finished', streamId);
-          isPlayingRoom = false;
-          removeAllRemoteTiles();
-        });
-
-        s.on('newTrackAvailable', playVideo);
-
-        s.on('track_list_updated', () => requestBroadcastObject(roomNameEl.value.trim()));
-
-        s.on('video_track_assignments', ({ payload }) => {
-          payload.forEach(item => {
-            const overlay = document.getElementById('overlay-' + item.videoLabel);
-            if (overlay != null) {
-              overlay.innerHTML = item.videoLabel + '->' + item.trackId;
-            }
-          });
-        });
-
-        s.on('reconnection_attempt_for_player', () => {
-          log('Reconnection attempt (player)');
-        });
-      }
-
-      function playVideo(obj) {
-        // EXACT copy of conference.html playVideo function
-        var roomId = roomNameEl.value.trim();
-        
-        //trackId is ARDAMSv+STREAM_ID or ARDAMSa+STREAM_ID
-        var incomingTrackId = obj.trackId.substring("ARDAMSx".length);
-        
-        if (incomingTrackId == roomId || incomingTrackId == publishStreamId) {
-          return;
-        }
-        
-        var video = document.getElementById("remoteVideo-" + incomingTrackId);
-        
-        if (video == null) {
-          createRemoteTile(incomingTrackId, obj.track.kind);
-          video = document.getElementById("remoteVideo-" + incomingTrackId);
-          video.srcObject = new MediaStream();
-        }
-        
-        video.srcObject.addTrack(obj.track);
-        
-        obj.track.onended = event => {
-          console.log("track is ended with id: " + event.target.id);
-        };
-        
-        obj.stream.onremovetrack = event => {
-          console.log("track is removed with id: " + event.track.id);
-          var removedTrackId = event.track.id.substring("ARDAMSx".length);
-          removeRemoteTile(removedTrackId);
-        };
-      }
-
-      client.on('broadcast_object', handleBroadcastObject);
-
-      client.on('error', ({ error, streamId }) => {
-        appendMessage(`Error: ${error}${streamId ? ` (${streamId})` : ''}`);
-      });
-    </script>
-  </body>
+  // ?id= (the invite link) fills the room name; joining is yours to do
+  rid.value = new URLSearchParams(location.search).get("id") || "room1";
+  nick.value = `Guest ${Math.floor(100 + Math.random() * 900)}`;
+  tiles.perPage = Number(perPage.value);
+  showRoom();
+  preview();
+</script>
+</body>
 </html>
-

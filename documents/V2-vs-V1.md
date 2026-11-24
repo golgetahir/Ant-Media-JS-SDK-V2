@@ -211,5 +211,6 @@ These v1 features have no v2 equivalent:
 - **Bitrate and degradation defaults.** v1 capped the video at 1200 kbps when a publish connected, and set `maintain-resolution` on the video sender. v2 sets neither. A value set with `changeBandwidth` or `setDegradationPreference` is applied again after each recovery.
 - **Received text.** v1 escaped `<` and `>` in any received string containing `script`. v2 passes text through unchanged unless `sanitizeDataChannelStrings: true`, which escapes every `<` and `>`.
 - **Sending without a channel.** v1 `sendData` returned without sending when the channel was not open. v2 rejects with `data_channel_not_available`.
+- **Sending large binary data.** v1 had no sending limit. v2 rejects binary data over 64 MiB with `data_too_large`, the most the receiving side reassembles.
 - **`changeBandwidth` without a sender.** v1 rejected. v2 resolves and does nothing.
 - **Duplicate ids.** Publishing or playing an id already active on the same client rejects with `streamIdInUse` without contacting the server.

@@ -905,6 +905,10 @@ export class WebRTCClient extends Emitter<EventMap> {
       open().send(data);
       return;
     }
+    // the receiver would not reassemble it
+    if (data.byteLength > MAX_TRANSFER_BYTES) {
+      throw new SDKError("data_too_large", `binary data over ${MAX_TRANSFER_BYTES} bytes`);
+    }
     const channel = open();
     const CHUNK_SIZE = 16000;
     const length = data.byteLength;
@@ -1147,7 +1151,10 @@ export class WebRTCClient extends Emitter<EventMap> {
           for (const [t, s] of transfers) {
             if (now - s.ts > CHUNK_TTL_MS) transfers.delete(t);
           }
-          if (total >= 1 && total <= MAX_TRANSFER_BYTES) {
+          if (total === 0) {
+            // no chunks follow an empty message
+            this.emit("data_received", { streamId, data: new ArrayBuffer(0) });
+          } else if (total >= 1 && total <= MAX_TRANSFER_BYTES) {
             transfers.set(token, { expected: total, received: 0, buffers: [], ts: now });
           }
           return;

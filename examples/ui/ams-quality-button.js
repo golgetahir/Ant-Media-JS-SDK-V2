@@ -12,13 +12,14 @@ const name = (height) => (height ? `${height}p` : "Automatic");
 class AmsQualityButton extends SessionElement {
   client = null;
   #height = 0;
+  #show;
 
   connectedCallback() {
     this.innerHTML = `
       <button class="ctl" type="button" aria-haspopup="menu" aria-expanded="false">${icon("quality")}</button>
       <div class="menu" role="menu" aria-label="Quality" hidden></div>`;
-    const show = dockMenu(this, (item) => this.#force(Number(item.dataset.height)));
-    this.firstElementChild.onclick = () => show(this.lastElementChild.hidden);
+    this.#show = dockMenu(this, (item) => this.#force(Number(item.dataset.height)));
+    this.firstElementChild.onclick = () => this.#show(this.lastElementChild.hidden);
     this.#fill([]);
   }
 
@@ -68,6 +69,7 @@ class AmsQualityButton extends SessionElement {
     if (!menu) return;
     const label = `Quality: ${name(this.#height)}`;
     button.disabled = this.session?.state !== "live" || isWaiting(this.session);
+    if (button.disabled) this.#show(false);
     button.title = label;
     button.setAttribute("aria-label", label);
     for (const item of menu.children) item.setAttribute("aria-checked", Number(item.dataset.height) === this.#height);

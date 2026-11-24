@@ -76,6 +76,7 @@ These are the codes the SDK produces itself. Each appears as `SDKError.code` on 
 | `data_channel_error` | The data channel reported an error while open. |
 | `data_channel_blob_parse_failed` | A `Blob` message from the data channel could not be read. |
 | `data_channel_not_available` | `sendData()` without an open data channel. |
+| `data_too_large` | `sendData()` with binary data larger than 64 MiB. |
 | `set_sink_id_failed` | `media.setAudioOutput()` failed on the element. |
 | `set_sink_id_unsupported` | `media.setAudioOutput()` on an element without `setSinkId`. |
 | `session_not_live` | A session method was called while the session was `starting`. |

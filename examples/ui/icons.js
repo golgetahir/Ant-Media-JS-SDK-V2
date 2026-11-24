@@ -24,7 +24,16 @@ const shapes = {
   live: '<circle cx="12" cy="12" r="2"/><path d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8"/>',
   clip: '<path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.7-7.7"/>',
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+  pin: '<path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z"/><path d="M12 14v6"/>',
+  prev: '<path d="M15 6l-6 6 6 6"/>',
+  next: '<path d="M9 6l6 6-6 6"/>',
 };
 
 /** Inline SVG markup for an icon, styled by `svg.i` in ui.css. */
 export const icon = (name) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${shapes[name]}</svg>`;
+
+/** An icon that says something on its own: `label` is read out, and shown on hover. */
+export const mark = (name, label) => `<span class="mark" role="img" aria-label="${label}" title="${label}">${icon(name)}</span>`;
+
+/** The letter on a person's avatar. */
+export const initial = (name) => [...name][0]?.toUpperCase() ?? "";
